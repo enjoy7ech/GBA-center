@@ -1,6 +1,6 @@
 # GBA Center
 
-一个基于 React、Vite 与 mGBA WebAssembly 核心的浏览器 GBA 游戏中心。结构参考 `NES-center`，游戏目录和模拟器适配层相互独立。
+一个基于 React、Vite 与 mGBA WebAssembly 核心的浏览器 GBA 游戏中心。
 
 ## 开发
 
