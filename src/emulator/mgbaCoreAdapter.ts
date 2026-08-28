@@ -36,6 +36,13 @@ export type EmulatorCallbacks = {
 const ROM_PATH = '/game.gba'
 const STATE_PATH = '/game.state'
 const MINIMUM_PRESS_MS = 56
+const MGBA_CORE_OPTIONS = [
+  // Plus/hack ROMs can retain the signature of a known retail-game idle loop
+  // while repurposing that code for event processing. Skipping it can leave
+  // scripted units stationary and soft-lock tutorials/cutscenes.
+  `mgba_idle_optimization = "Don't Remove"`,
+  'mgba_frameskip = "0"',
+].join('\n')
 
 const inputIndex: Record<GbaButton, number> = {
   b: 0,
@@ -95,7 +102,9 @@ export class MgbaCoreAdapter {
         canvas,
         noInitialRun: true,
         arguments: [],
-        callbacks: {},
+        callbacks: {
+          setupCoreSettingFile: (path: string) => this.writeCoreSettings(path),
+        },
         parent: host,
         locateFile: path => `/cores/${path}`,
         getSavExt: () => '.sav',
@@ -223,7 +232,12 @@ export class MgbaCoreAdapter {
   private applyCheats() {
     if (!this.resetCheats || !this.setCheat) return
     this.resetCheats()
-    this.cheats.forEach((cheat, index) => this.setCheat?.(index, cheat.enabled ? 1 : 0, cheat.code))
+    // This EmulatorJS core still parses/registers a code passed with enabled=0.
+    // Never submit disabled rules at all; rebuild the core cheat list using only
+    // switches that are visibly ON.
+    this.cheats
+      .filter(cheat => cheat.enabled)
+      .forEach((cheat, index) => this.setCheat?.(index, 1, cheat.code))
   }
 
   releaseInputs() {
@@ -282,6 +296,18 @@ export class MgbaCoreAdapter {
       'video_gpu_screenshot = "true"',
       'notification_show_screenshot = "false"',
     ].join('\n')))
+  }
+
+  private writeCoreSettings(path: string) {
+    const fileSystem = this.module?.FS
+    if (!fileSystem) return
+    const directories = path.split('/').slice(1, -1)
+    let current = ''
+    for (const directory of directories) {
+      current += `/${directory}`
+      this.mkdir(current)
+    }
+    fileSystem.writeFile(path, new TextEncoder().encode(MGBA_CORE_OPTIONS))
   }
 
   private mkdir(path: string) {

@@ -99,20 +99,6 @@ export const games: Game[] = [
         enabled: false,
         builtIn: true,
       },
-      {
-        id: 'fire-emblem-plus-v5-first-unit-exp-99',
-        name: '编队首位：经验 99（用后即关）',
-        code: '3202BD55 0063',
-        enabled: false,
-        builtIn: true,
-      },
-      {
-        id: 'fire-emblem-plus-v5-first-unit-unlimited-actions',
-        name: '编队首位：无限行动（仅战斗中）',
-        code: '3202BD58 0000',
-        enabled: false,
-        builtIn: true,
-      },
     ],
   },
   {

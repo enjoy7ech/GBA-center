@@ -636,8 +636,14 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     try {
       const saved = localStorage.getItem(cheatStorageKey)
       const stored = saved === null ? [] : JSON.parse(saved) as CheatRule[]
-      const storedIds = new Set(stored.map(cheat => cheat.id))
-      return [...stored, ...(route.game.cheats ?? []).filter(cheat => !storedIds.has(cheat.id))]
+      const currentBuiltIns = new Map((route.game.cheats ?? []).map(cheat => [cheat.id, cheat]))
+      const migrated = stored.flatMap(cheat => {
+        if (!cheat.builtIn) return [cheat]
+        const current = currentBuiltIns.get(cheat.id)
+        return current ? [{ ...current, enabled: cheat.enabled }] : []
+      })
+      const migratedIds = new Set(migrated.map(cheat => cheat.id))
+      return [...migrated, ...(route.game.cheats ?? []).filter(cheat => !migratedIds.has(cheat.id))]
     } catch { return route.game.cheats ?? [] }
   })
 
