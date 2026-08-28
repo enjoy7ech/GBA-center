@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#7069ad"/>
+      <stop offset="1" stop-color="#292650"/>
+    </linearGradient>
+    <linearGradient id="shell" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#eeede7"/>
+      <stop offset="1" stop-color="#aaa9a5"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <g opacity=".12" fill="none" stroke="#fff" stroke-width="9">
+    <circle cx="70" cy="80" r="19"/><circle cx="448" cy="130" r="27"/><path d="M35 388h70M70 353v70M390 390h82M431 349v82"/>
+  </g>
+  <path d="M78 112c0-25 20-45 45-45h266c25 0 45 20 45 45v272c0 34-27 61-61 61H123c-25 0-45-20-45-45V112Z" fill="url(#shell)" stroke="#f8f7ef" stroke-width="10"/>
+  <rect x="111" y="103" width="290" height="178" rx="25" fill="#333445"/>
+  <rect x="128" y="120" width="256" height="144" rx="9" fill="#9cad80" stroke="#181921" stroke-width="7"/>
+  <g fill="#202127">
+    <rect x="118" y="333" width="112" height="38" rx="9"/>
+    <rect x="155" y="296" width="38" height="112" rx="9"/>
+    <circle cx="174" cy="352" r="13" fill="#17181d"/>
+  </g>
+  <g fill="#96345e" stroke="#68213f" stroke-width="8">
+    <circle cx="326" cy="356" r="31"/>
+    <circle cx="384" cy="320" r="31"/>
+  </g>
+  <g fill="#504b88">
+    <rect x="213" y="396" width="54" height="16" rx="8" transform="rotate(-5 240 404)"/>
+    <rect x="278" y="390" width="54" height="16" rx="8" transform="rotate(-5 305 398)"/>
+  </g>
+  <text x="256" y="208" fill="#35432e" font-family="Arial,sans-serif" font-size="74" font-style="italic" font-weight="900" text-anchor="middle">GBA</text>
+</svg>

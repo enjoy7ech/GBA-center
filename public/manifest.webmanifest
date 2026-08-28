@@ -1,0 +1,22 @@
+{
+  "name": "董哥的小神游",
+  "short_name": "董哥的小神游",
+  "description": "董哥的小神游：在浏览器中整理并游玩你的 Game Boy Advance 游戏。",
+  "lang": "zh-CN",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#282544",
+  "theme_color": "#39355f",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
