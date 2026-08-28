@@ -1,6 +1,6 @@
 # GBA Center
 
-一个基于 React、Vite 与 mGBA WebAssembly 核心的浏览器 GBA 游戏中心。结构参考 `NES-center`，游戏目录和模拟器适配层相互独立。
+一个基于 React、Vite 与 mGBA WebAssembly 核心的浏览器 GBA 游戏中心。
 
 ## 开发
 
@@ -11,7 +11,6 @@ pnpm dev
 
 项目直接加载 `public/cores` 中的 mGBA WebAssembly/libretro 核心，不包含第三方模拟器界面。构建产物无需联网即可运行核心。
 
-模拟器页与 `NES-center` 保持同一套操作方式：
 
 - 短按存档/读档打开槽位，长按使用快速槽；包含自动槽、快速槽和 8 个普通槽位。
 - 存档保存在 IndexedDB，带画面缩略图、保存时间、长按删除，以及当前游戏的导入/导出。
