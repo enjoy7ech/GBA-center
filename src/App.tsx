@@ -5,18 +5,18 @@ import type { CheatRule, EmulatorSpeed, EmulatorStatus, GbaButton, SaveStateSlot
 
 type Route = { page: 'home' } | { page: 'play'; game: Game }
 
-type KeyboardAction = GbaButton | 'quickSave' | 'quickLoad' | 'speedToggle'
+type KeyboardAction = GbaButton | 'quickSave' | 'quickLoad' | 'speedToggle' | 'cleanModeToggle'
 type KeyboardBindings = Record<KeyboardAction, string>
 const keyboardBindingsKey = 'gba-center:keyboard-bindings'
 const controllerActions: GbaButton[] = ['up', 'down', 'left', 'right', 'b', 'a', 'l', 'r', 'select', 'start']
-const bindingActions: KeyboardAction[] = [...controllerActions, 'quickSave', 'quickLoad', 'speedToggle']
+const bindingActions: KeyboardAction[] = [...controllerActions, 'quickSave', 'quickLoad', 'speedToggle', 'cleanModeToggle']
 const defaultKeyboardBindings: KeyboardBindings = {
   up: 'w', down: 's', left: 'a', right: 'd', b: 'q', a: 'e', l: 'z', r: 'c', select: ' ', start: 'Enter',
-  quickSave: 'F5', quickLoad: 'F8', speedToggle: 'x',
+  quickSave: 'F5', quickLoad: 'F8', speedToggle: 'x', cleanModeToggle: 'F9',
 }
 const keyboardLabels: Record<KeyboardAction, string> = {
   up: '上', down: '下', left: '左', right: '右', b: 'B 键', a: 'A 键', l: 'L 键', r: 'R 键', select: '选择', start: '开始',
-  quickSave: '快速存档', quickLoad: '快速读档', speedToggle: '倍速切换',
+  quickSave: '快速存档', quickLoad: '快速读档', speedToggle: '倍速切换', cleanModeToggle: '纯画面模式',
 }
 
 function normalizeKeyboardKey(key: string) { return key.length === 1 ? key.toLowerCase() : key }
@@ -610,7 +610,7 @@ function KeyboardSettings({ bindings, onBind, onReset, onClose }: {
       <header className="pixel-dialog-heading"><div><span>GAME BOY ADVANCE</span><h2 id="keyboard-title">系统设置</h2></div><button onClick={onClose} aria-label="关闭系统设置">×</button></header>
       <div className="binding-sections">
         <section><header><strong>游戏控制</strong><span>PLAYER 1</span></header><div className="binding-grid">{controllerActions.map(action => <button className={capturing === action ? 'is-capturing' : ''} key={action} onClick={() => setCapturing(action)}><span>{keyboardLabels[action]}</span><kbd>{capturing === action ? '按新键…' : displayKeyboardKey(bindings[action])}</kbd></button>)}</div></section>
-        <section><header><strong>快捷功能</strong><span>SYSTEM</span></header><div className="binding-grid">{(['quickSave', 'quickLoad', 'speedToggle'] as KeyboardAction[]).map(action => <button className={capturing === action ? 'is-capturing' : ''} key={action} onClick={() => setCapturing(action)}><span>{keyboardLabels[action]}</span><kbd>{capturing === action ? '按新键…' : displayKeyboardKey(bindings[action])}</kbd></button>)}</div></section>
+        <section><header><strong>快捷功能</strong><span>SYSTEM</span></header><div className="binding-grid">{(['quickSave', 'quickLoad', 'speedToggle', 'cleanModeToggle'] as KeyboardAction[]).map(action => <button className={capturing === action ? 'is-capturing' : ''} key={action} onClick={() => setCapturing(action)}><span>{keyboardLabels[action]}</span><kbd>{capturing === action ? '按新键…' : displayKeyboardKey(bindings[action])}</kbd></button>)}</div></section>
       </div>
       <footer className="pixel-dialog-footer keyboard-footer"><span>{capturing ? '按下新按键，Esc 取消' : '重复键会自动交换；P 键打开设置'}</span><button type="button" onClick={onReset}>恢复默认</button><button type="button" onClick={onClose}>完成</button></footer>
     </section>
@@ -624,7 +624,9 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
   const [busySlot, setBusySlot] = useState<number | null>(null)
   const [quickBusy, setQuickBusy] = useState(false)
   const [quickNotice, setQuickNotice] = useState('')
+  const [cleanMode, setCleanMode] = useState(false)
   const operationBusy = useRef(false)
+  const lastCleanModeTap = useRef(0)
   const [speed, setSpeed] = useState<EmulatorSpeed>(1)
   const adapter = useRef<MgbaCoreAdapter | null>(null)
   const title = route.game.title
@@ -687,6 +689,14 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     return () => window.clearTimeout(timer)
   }, [quickNotice])
 
+  useEffect(() => {
+    const leaveWithEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCleanMode(false)
+    }
+    window.addEventListener('keydown', leaveWithEscape, true)
+    return () => window.removeEventListener('keydown', leaveWithEscape, true)
+  }, [])
+
   const controlsDisabled = status === 'loading' || status === 'error'
   const sendInput = (button: GbaButton, pressed: boolean) => adapter.current?.setInput(button, pressed)
   const openTool = (tool: GameTool) => {
@@ -735,6 +745,15 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     if (adapter.current?.setSpeed(next)) { setSpeed(next); triggerHapticFeedback() }
   }
   const updateCheats = (next: CheatRule[]) => { setCheats(next); adapter.current?.setCheats(next); triggerHapticFeedback() }
+  const leaveCleanMode = () => {
+    setCleanMode(false)
+  }
+  const handleCleanModePointerUp = (pointerType: string) => {
+    if (!cleanMode || pointerType === 'mouse') return
+    const now = performance.now()
+    if (now - lastCleanModeTap.current < 360) leaveCleanMode()
+    lastCleanModeTap.current = now
+  }
   const exportStates = () => {
     void adapter.current?.exportStates().then(contents => {
       const backup = JSON.parse(contents) as Record<string, unknown>
@@ -771,21 +790,27 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
       if (event.repeat || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
       const key = normalizeKeyboardKey(event.key)
       const mode = key === keyboardBindings.quickSave ? 'save' : key === keyboardBindings.quickLoad ? 'load' : null
-      if (!mode && key !== keyboardBindings.speedToggle) return
+      const togglesCleanMode = key === keyboardBindings.cleanModeToggle
+      if (!mode && key !== keyboardBindings.speedToggle && !togglesCleanMode) return
       event.preventDefault(); event.stopImmediatePropagation()
       if (mode) quickSlot(mode)
+      else if (togglesCleanMode) {
+        adapter.current?.releaseInputs()
+        setActiveTool(null)
+        setCleanMode(value => !value)
+      }
       else cycleSpeed()
     }
     const blockKeyUp = (event: KeyboardEvent) => {
       const key = normalizeKeyboardKey(event.key)
-      if (![keyboardBindings.quickSave, keyboardBindings.quickLoad, keyboardBindings.speedToggle].includes(key)) return
+      if (![keyboardBindings.quickSave, keyboardBindings.quickLoad, keyboardBindings.speedToggle, keyboardBindings.cleanModeToggle].includes(key)) return
       event.preventDefault(); event.stopImmediatePropagation()
     }
     window.addEventListener('keydown', handleQuickKey, true); window.addEventListener('keyup', blockKeyUp, true)
     return () => { window.removeEventListener('keydown', handleQuickKey, true); window.removeEventListener('keyup', blockKeyUp, true) }
   }, [keyboardBindings, speed, status, quickBusy])
 
-  return <main className="player-page">
+  return <main className={`player-page${cleanMode ? ' is-clean-mode' : ''}`}>
     <section className="player-layout console" aria-label="GBA 模拟器">
       <div className="control-zone control-zone-left side-controls side-controls-left">
         <ConsoleButton button="l" label="L" className="shoulder-control shoulder-control-left" disabled={controlsDisabled} onInput={sendInput} />
@@ -798,7 +823,7 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
           <button type="button" disabled={controlsDisabled} className={speed > 1 ? 'is-speed-active' : ''} onClick={cycleSpeed}><span>»</span>倍速 {speed}×</button>
           <button type="button" disabled={controlsDisabled} onClick={() => openTool('cheats')}><span>★</span>金手指</button>
         </nav>
-        <div className="screen-frame screen-wrap"><div id="game" className="emulator-container emulator-host" />
+        <div className="screen-frame screen-wrap" onDoubleClick={() => { if (cleanMode) leaveCleanMode() }} onPointerUp={event => handleCleanModePointerUp(event.pointerType)}><div id="game" className="emulator-container emulator-host" />
           {status === 'loading' && <div className="loading-screen"><div className="loading-logo">GBA</div><span>mGBA CORE</span><i /></div>}
         </div>
         <div className="center-controls" aria-label="功能键"><ConsoleButton button="select" label="SELECT" className="utility-control utility-button" disabled={controlsDisabled} onInput={sendInput} /><ConsoleButton button="start" label="START" className="utility-control utility-button" disabled={controlsDisabled} onInput={sendInput} /></div>
