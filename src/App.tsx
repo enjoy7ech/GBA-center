@@ -23,6 +23,8 @@ function normalizeKeyboardKey(key: string) { return key.length === 1 ? key.toLow
 function displayKeyboardKey(key: string) {
   return ({ ' ': 'Space', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' } as Record<string, string>)[key] ?? (key.length === 1 ? key.toUpperCase() : key)
 }
+
+const nativeSwitchProps = { switch: '' } as React.InputHTMLAttributes<HTMLInputElement>
 function loadKeyboardBindings(): KeyboardBindings {
   try {
     const saved = JSON.parse(localStorage.getItem(keyboardBindingsKey) ?? '{}') as Partial<KeyboardBindings>
@@ -56,46 +58,87 @@ function ConsoleButton({
   disabled?: boolean
   onInput: (button: GbaButton, pressed: boolean) => void
 }) {
+  const element = useRef<HTMLLabelElement>(null)
   const pointerId = useRef<number | null>(null)
+  const pressedRef = useRef(false)
+  const inputHandler = useRef(onInput)
   const [pressed, setPressed] = useState(false)
+  inputHandler.current = onInput
 
-  const release = () => {
-    if (pointerId.current === null && !pressed) return
+  const updatePressed = (next: boolean) => {
+    pressedRef.current = next
+    setPressed(next)
+  }
+  const release = (releasedPointer?: number) => {
+    if (releasedPointer !== undefined && pointerId.current !== releasedPointer) return
+    const capturedPointer = pointerId.current
+    if (capturedPointer === null && !pressedRef.current) return
     pointerId.current = null
-    setPressed(false)
-    onInput(button, false)
+    updatePressed(false)
+    inputHandler.current(button, false)
+    if (capturedPointer !== null && element.current?.hasPointerCapture(capturedPointer)) {
+      element.current.releasePointerCapture(capturedPointer)
+    }
+    element.current?.querySelector('input')?.blur()
+    element.current?.blur()
   }
 
   useEffect(() => {
+    const releasePointer = (event: PointerEvent) => release(event.pointerId)
     const releaseAll = () => release()
+    window.addEventListener('pointerup', releasePointer, true)
+    window.addEventListener('pointercancel', releasePointer, true)
     window.addEventListener('blur', releaseAll)
+    window.addEventListener('pagehide', releaseAll)
     document.addEventListener('visibilitychange', releaseAll)
     return () => {
+      window.removeEventListener('pointerup', releasePointer, true)
+      window.removeEventListener('pointercancel', releasePointer, true)
       window.removeEventListener('blur', releaseAll)
+      window.removeEventListener('pagehide', releaseAll)
       document.removeEventListener('visibilitychange', releaseAll)
-      onInput(button, false)
+      if (pressedRef.current) inputHandler.current(button, false)
     }
   }, [button])
 
   return (
-    <button
-      type="button"
-      className={`console-button ${className}${pressed ? ' is-pressed' : ''}`}
-      disabled={disabled}
+    <label
+      ref={element}
+      className={`console-button ${className}${pressed ? ' is-pressed' : ''}${disabled ? ' is-disabled' : ''}`}
+      role="button"
+      tabIndex={disabled ? -1 : 0}
       aria-label={label}
+      aria-disabled={disabled}
+      aria-pressed={pressed}
       onPointerDown={event => {
         if (disabled || event.button !== 0 || pointerId.current !== null) return
         pointerId.current = event.pointerId
-        event.currentTarget.setPointerCapture(event.pointerId)
-        setPressed(true)
+        updatePressed(true)
+        try { event.currentTarget.setPointerCapture(event.pointerId) } catch { /* Global release listeners cover older Safari. */ }
         triggerHapticFeedback()
-        onInput(button, true)
+        inputHandler.current(button, true)
       }}
-      onPointerUp={release}
-      onPointerCancel={release}
-      onLostPointerCapture={release}
+      onPointerUp={event => release(event.pointerId)}
+      onPointerCancel={event => release(event.pointerId)}
+      onLostPointerCapture={() => release()}
       onContextMenu={event => event.preventDefault()}
-    >{label}</button>
+      onKeyDown={event => {
+        if (disabled || event.repeat || (event.key !== 'Enter' && event.key !== ' ')) return
+        event.preventDefault()
+        updatePressed(true)
+        triggerHapticFeedback()
+        inputHandler.current(button, true)
+      }}
+      onKeyUp={event => {
+        if (disabled || (event.key !== 'Enter' && event.key !== ' ')) return
+        event.preventDefault()
+        updatePressed(false)
+        inputHandler.current(button, false)
+      }}
+    >
+      <input {...nativeSwitchProps} className="ios-haptic-switch" type="checkbox" disabled={disabled} tabIndex={-1} aria-hidden="true" />
+      <span className="control-button-text" aria-hidden="true">{label}</span>
+    </label>
   )
 }
 
@@ -127,17 +170,30 @@ function DirectionalPad({ disabled, onInput }: { disabled?: boolean; onInput: (b
     setDirection(Math.abs(x) > Math.abs(y) ? (x > 0 ? 'right' : 'left') : (y > 0 ? 'down' : 'up'))
   }
 
-  const release = () => {
+  const release = (releasedPointer?: number) => {
+    if (releasedPointer !== undefined && pointerId.current !== releasedPointer) return
+    const capturedPointer = pointerId.current
     pointerId.current = null
     setDirection(null)
+    if (capturedPointer !== null && element.current?.hasPointerCapture(capturedPointer)) {
+      element.current.releasePointerCapture(capturedPointer)
+    }
+    element.current?.querySelector('input')?.blur()
   }
 
   useEffect(() => {
+    const releasePointer = (event: PointerEvent) => release(event.pointerId)
     const releaseAll = () => release()
+    window.addEventListener('pointerup', releasePointer, true)
+    window.addEventListener('pointercancel', releasePointer, true)
     window.addEventListener('blur', releaseAll)
+    window.addEventListener('pagehide', releaseAll)
     document.addEventListener('visibilitychange', releaseAll)
     return () => {
+      window.removeEventListener('pointerup', releasePointer, true)
+      window.removeEventListener('pointercancel', releasePointer, true)
       window.removeEventListener('blur', releaseAll)
+      window.removeEventListener('pagehide', releaseAll)
       document.removeEventListener('visibilitychange', releaseAll)
       if (direction.current) onInput(direction.current, false)
     }
@@ -151,18 +207,22 @@ function DirectionalPad({ disabled, onInput }: { disabled?: boolean; onInput: (b
       aria-label="方向键"
       onPointerDown={event => {
         if (disabled || event.button !== 0 || pointerId.current !== null) return
+        event.preventDefault()
         pointerId.current = event.pointerId
-        event.currentTarget.setPointerCapture(event.pointerId)
+        try { event.currentTarget.setPointerCapture(event.pointerId) } catch { /* Global release listeners cover older Safari. */ }
         updateDirection(event.clientX, event.clientY)
       }}
       onPointerMove={event => {
-        if (pointerId.current === event.pointerId) updateDirection(event.clientX, event.clientY)
+        if (pointerId.current !== event.pointerId) return
+        event.preventDefault()
+        updateDirection(event.clientX, event.clientY)
       }}
-      onPointerUp={release}
-      onPointerCancel={release}
-      onLostPointerCapture={release}
+      onPointerUp={event => release(event.pointerId)}
+      onPointerCancel={event => release(event.pointerId)}
+      onLostPointerCapture={() => release()}
       onContextMenu={event => event.preventDefault()}
     >
+      <input {...nativeSwitchProps} className="ios-haptic-switch dpad-haptic-switch" type="checkbox" disabled={disabled} tabIndex={-1} aria-hidden="true" />
       <span className="dpad-bar dpad-bar-horizontal" />
       <span className="dpad-bar dpad-bar-vertical" />
       <i className="dpad-center" />
