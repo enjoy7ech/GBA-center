@@ -30,6 +30,66 @@ export type Game = {
  */
 export const games: Game[] = [
   {
+    id: 'pokemon-unbound-v2-1-1-chs-revised',
+    title: '宝可梦：解放',
+    subtitle: 'POKÉMON UNBOUND v2.1.1',
+    rom: '/roms/pokemon-unbound-v2-1-1-chs-revised.gba',
+    cover: '/covers/pokemon-unbound-v2-1-1-chs-revised.png',
+    color: '#6450a4',
+    tags: ['RPG', '改版', '汉化修订'],
+    cheats: [
+      {
+        id: 'pokemon-unbound-v2-1-1-max-money',
+        name: '金钱 999999（生效后关闭）',
+        code: '820257BC 423F+820257BE 000F',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'pokemon-unbound-v2-1-1-mart-cost-one',
+        name: '友好商店商品价格 1',
+        code: '3C25A344 FD8F451C+AD86124F 2823D8DA',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'pokemon-unbound-v2-1-1-rare-candy-first-ball-slot',
+        name: '精灵球口袋首格变神奇糖果（用后关闭）',
+        code: '000014D1 000A+4203C354 0044+00010001 0004',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'pokemon-unbound-v2-1-1-master-ball-first-ball-slot',
+        name: '精灵球口袋首格变大师球（用后关闭）',
+        code: '000014D1 000A+4203C354 0001+00010001 0004',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'pokemon-unbound-v2-1-1-guaranteed-catch',
+        name: '100% 捕获（投球时开启，捕获后关闭）',
+        code: '72023D74 9A93+82023D74 7861+72023D74 7861+82023D76 0896',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'pokemon-unbound-v2-1-1-shiny-wild',
+        name: '野生异色（捕获后关闭）',
+        code: 'C34A5E26 58D1FACD+F935E412 9CD138A2+4270C392 40AA6F6F+AE649533 0ABCCE2C',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'pokemon-unbound-v2-1-1-one-hit-ko',
+        name: '一击必杀（仅战斗时开启）',
+        code: '95EDFBBA A5A72A78+C833D1A0 02FA7205',
+        enabled: false,
+        builtIn: true,
+      },
+    ],
+  },
+  {
     id: 'final-fantasy-vi-advance-chs',
     title: '最终幻想 VI Advance',
     subtitle: 'FINAL FANTASY VI ADVANCE',
