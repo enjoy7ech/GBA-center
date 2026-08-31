@@ -911,8 +911,10 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
           <button type="button" disabled={controlsDisabled} className={speed > 1 ? 'is-speed-active' : ''} onClick={cycleSpeed}><span>»</span>倍速 {speed}×</button>
           <button type="button" disabled={controlsDisabled} onClick={() => openTool('cheats')}><span>★</span>金手指</button>
         </nav>
-        <div className="screen-frame screen-wrap" onDoubleClick={() => { if (cleanMode) leaveCleanMode() }} onPointerUp={event => handleCleanModePointerUp(event.pointerType)}><div id="game" className="emulator-container emulator-host" />
-          {status === 'loading' && <div className="loading-screen"><div className="loading-logo">GBA</div><span>mGBA CORE</span><i /></div>}
+        <div className="screen-stage">
+          <div className="screen-frame screen-wrap" onDoubleClick={() => { if (cleanMode) leaveCleanMode() }} onPointerUp={event => handleCleanModePointerUp(event.pointerType)}><div id="game" className="emulator-container emulator-host" />
+            {status === 'loading' && <div className="loading-screen"><div className="loading-logo">GBA</div><span>mGBA CORE</span><i /></div>}
+          </div>
         </div>
         <div className="center-controls" aria-label="功能键"><ConsoleButton button="select" label="SELECT" className="utility-control utility-button" disabled={controlsDisabled} onInput={sendInput} /><ConsoleButton button="start" label="START" className="utility-control utility-button" disabled={controlsDisabled} onInput={sendInput} /></div>
       </div>
