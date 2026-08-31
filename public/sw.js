@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gba-center-v5'
+const CACHE_NAME = 'gba-center-v6'
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
@@ -38,26 +38,38 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return
 
   if (request.mode === 'navigate') {
-    event.respondWith(
+    let cacheUpdate = Promise.resolve()
+    const responsePromise =
       fetch(request)
         .then(response => {
-          if (response.ok) void caches.open(CACHE_NAME).then(cache => cache.put('/', response.clone()))
+          if (response.ok) {
+            const responseForCache = response.clone()
+            cacheUpdate = caches.open(CACHE_NAME)
+              .then(cache => cache.put('/', responseForCache))
+              .catch(reason => console.warn('[SW] 页面缓存写入失败。', reason))
+          }
           return response
         })
-        .catch(async () => (await caches.match(request)) || (await caches.match('/')) || Response.error()),
-    )
+        .catch(async () => (await caches.match(request)) || (await caches.match('/')) || Response.error())
+    event.respondWith(responsePromise)
+    event.waitUntil(responsePromise.then(() => cacheUpdate))
     return
   }
 
-  event.respondWith(
+  let cacheUpdate = Promise.resolve()
+  const responsePromise =
     caches.match(request).then(cached => {
       if (cached) return cached
       return fetch(request).then(response => {
         if (response.ok && response.status !== 206) {
-          void caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()))
+          const responseForCache = response.clone()
+          cacheUpdate = caches.open(CACHE_NAME)
+            .then(cache => cache.put(request, responseForCache))
+            .catch(reason => console.warn('[SW] 资源缓存写入失败。', reason))
         }
         return response
       })
-    }),
-  )
+    })
+  event.respondWith(responsePromise)
+  event.waitUntil(responsePromise.then(() => cacheUpdate))
 })

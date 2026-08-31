@@ -22,6 +22,26 @@ button, input { font: inherit; }
 button { color: inherit; }
 button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.pwa-titlebar-drag-region { display: none; }
+
+@media (display-mode: window-controls-overlay) {
+  .pwa-titlebar-drag-region {
+    position: fixed;
+    z-index: 1000;
+    top: env(titlebar-area-y, 0);
+    left: env(titlebar-area-x, 0);
+    display: block;
+    width: env(titlebar-area-width, 100%);
+    height: env(titlebar-area-height, 0);
+    -webkit-app-region: drag;
+  }
+  button, input, textarea, a { -webkit-app-region: no-drag; }
+  .gba-home-shell { padding-top: calc(env(titlebar-area-height, 0px) + 12px); }
+  .player-page:not(.is-clean-mode) {
+    padding-top: max(4px, env(titlebar-area-height, 0px));
+  }
+  .player-page:not(.is-clean-mode) .player-layout.console { max-height: 100%; }
+}
 
 .home-page { min-height: 100vh; overflow: hidden; background: #0b1115; }
 .site-header { display: flex; width: min(1420px, calc(100% - 64px)); height: 88px; align-items: center; justify-content: space-between; margin: auto; border-bottom: 1px solid var(--line); }
@@ -455,10 +475,14 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline-color: #ec4
    the complete lower control area as one unit. */
 @media (orientation: landscape) and (max-width: 680px) {
   .player-layout.console {
+    width: 100%;
+    height: 100dvh;
     grid-template-areas: 'main';
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
+    padding: 4px 10px;
   }
+  .player-main.game-column { gap: 6px; padding-block: 0; }
   .player-layout.console .side-controls,
   .player-layout.console .center-controls { display: none; }
 }

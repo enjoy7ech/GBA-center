@@ -977,6 +977,7 @@ export default function App() {
   }
 
   return <>
+    <div className="pwa-titlebar-drag-region" aria-hidden="true" />
     {route.page === 'home'
       ? <HomePage openGame={openGame} openSettings={() => setShowSettings(true)} />
       : <EmulatorPage route={route} keyboardBindings={keyboardBindings} />}
