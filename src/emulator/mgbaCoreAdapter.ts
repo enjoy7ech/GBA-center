@@ -284,7 +284,16 @@ export class MgbaCoreAdapter {
     this.mkdir('/home/web_user/.config/retroarch')
     fileSystem.writeFile(ROM_PATH, rom)
     fileSystem.writeFile('/home/web_user/.config/retroarch/retroarch.cfg', new TextEncoder().encode([
-      'audio_latency = "64"',
+      'audio_driver = "openal"',
+      'audio_out_rate = "44100"',
+      'audio_resampler_quality = "1"',
+      'audio_latency = "128"',
+      'audio_sync = "true"',
+      'audio_rate_control = "true"',
+      'audio_rate_control_delta = "0.005000"',
+      'audio_max_timing_skew = "0.050000"',
+      'audio_fastforward_mute = "false"',
+      'audio_fastforward_speedup = "true"',
       'video_vsync = "true"',
       'video_smooth = "false"',
       'fastforward_ratio = "2.0"',
