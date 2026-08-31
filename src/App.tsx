@@ -504,6 +504,17 @@ function triggerHapticFeedback() {
   try { navigator.vibrate?.(12) } catch { /* Haptics are optional. */ }
 }
 
+async function shareBackupFile(file: File, title: string) {
+  if (!navigator.canShare?.({ files: [file] })) return false
+  try {
+    await navigator.share({ files: [file], title })
+    return true
+  } catch (reason) {
+    if (reason instanceof DOMException && reason.name === 'AbortError') throw reason
+    return false
+  }
+}
+
 function HoldActionButton({ icon, label, disabled, onPress, onHold }: {
   icon: string; label: string; disabled?: boolean; onPress: () => void; onHold: () => void
 }) {
@@ -821,14 +832,25 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     lastCleanModeTap.current = now
   }
   const exportStates = () => {
-    void adapter.current?.exportStates().then(contents => {
+    void adapter.current?.exportStates().then(async contents => {
       const backup = JSON.parse(contents) as Record<string, unknown>
       backup.cheats = cheats
-      const url = URL.createObjectURL(new Blob([JSON.stringify(backup)], { type: 'application/json' }))
+      const gameTitle = route.game.title.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-').replace(/[. ]+$/g, '') || route.game.id
+      const fileName = `${gameTitle}-存档.json`
+      const file = new File([JSON.stringify(backup)], fileName, { type: 'application/json' })
+      if (await shareBackupFile(file, fileName.replace(/\.json$/i, ''))) return
+      const url = URL.createObjectURL(file)
       const link = document.createElement('a')
-      link.href = url; link.download = `${adapter.current?.getGameId() ?? 'gba-game'}-存档.json`; link.click()
-      window.setTimeout(() => URL.revokeObjectURL(url), 0)
-    }).catch(reason => console.error('[GBA] 导出存档失败。', reason))
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    }).catch(reason => {
+      if (reason instanceof DOMException && reason.name === 'AbortError') return
+      console.error('[GBA] 导出存档失败。', reason)
+    })
   }
   const importStates = (file: File) => {
     if (operationBusy.current) return

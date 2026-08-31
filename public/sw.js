@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gba-center-v4'
+const CACHE_NAME = 'gba-center-v5'
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
