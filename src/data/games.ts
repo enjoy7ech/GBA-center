@@ -129,8 +129,15 @@ export const games: Game[] = [
       },
       {
         id: 'fire-emblem-plus-v5-infinite-weapon-durability',
-        name: '武器使用时耐久不减少',
-        code: '08029964:46C0+08029966:46C0',
+        name: '武器/杖使用时耐久不减少',
+        code: '08029964:46C0+08029966:46C0+0802AADC:46C0+0802AADE:46C0',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'fire-emblem-plus-v5-infinite-item-uses',
+        name: '物品使用次数不减少',
+        code: '0801882C:46C0+0801882E:46C0',
         enabled: false,
         builtIn: true,
       },

@@ -630,8 +630,8 @@ function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDele
   const isSaveMode = mode === 'save'
   const title = isSaveMode ? '存档' : mode === 'load' ? '读档' : '金手指'
   return <div className="pixel-dialog-backdrop" onContextMenu={event => event.preventDefault()} onPointerDown={event => { if (event.target === event.currentTarget) onClose() }}>
-    <section className="pixel-dialog" role="dialog" aria-modal="true" aria-labelledby="game-tool-title">
-      <header className="pixel-dialog-heading"><div><span>GAME BOY ADVANCE</span><h2 id="game-tool-title">{title}</h2></div><button onClick={onClose} aria-label={`关闭${title}`}>×</button></header>
+    <section className={`pixel-dialog${mode === 'cheats' ? ' is-cheat-dialog' : ''}`} role="dialog" aria-modal="true" aria-labelledby="game-tool-title">
+      <header className="pixel-dialog-heading"><h2 id="game-tool-title">{title}</h2><button onClick={onClose} aria-label={`关闭${title}`}>×</button></header>
       {mode !== 'cheats' ? <div className="save-slot-grid">
         {saveSlots.map(({ slot, label }) => {
           const saved = slots.find(item => item.slot === slot)
@@ -644,17 +644,14 @@ function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDele
           if (!code) return
           onAddCheat(code)
           setCheatCode('')
-        }}><label htmlFor="cheat-code">输入 GameShark / CodeBreaker 代码</label><div><input id="cheat-code" value={cheatCode} onChange={event => setCheatCode(event.target.value)} placeholder="例如 82000000 0001" spellCheck={false} /><button type="submit">添加</button></div></form>
-        <div className="pixel-cheat-list">{cheats.length === 0 ? <div className="pixel-empty-list">尚未添加代码</div> : cheats.map(cheat => <div className="pixel-cheat-row" key={cheat.id}>
+        }}><div><input id="cheat-code" aria-label="GameShark 或 CodeBreaker 代码" value={cheatCode} onChange={event => setCheatCode(event.target.value)} placeholder="GameShark / CodeBreaker 代码" spellCheck={false} /><button type="submit">添加</button></div></form>
+        <div className="pixel-cheat-list">{cheats.length === 0 ? <div className="pixel-empty-list">尚未添加代码</div> : cheats.map(cheat => <div className={`pixel-cheat-row${cheat.builtIn ? ' is-built-in' : ''}`} key={cheat.id}>
           <button type="button" className={cheat.enabled ? 'is-enabled' : ''} onClick={() => onToggleCheat(cheat.id)}>{cheat.enabled ? 'ON' : 'OFF'}</button>
           <span className="pixel-cheat-code">{cheat.name && <strong>{cheat.name}</strong>}<code>{cheat.code.replace(/\+/g, ' · ')}</code></span>
-          <button type="button" disabled={cheat.builtIn} aria-label={cheat.builtIn ? `内置金手指 ${cheat.name ?? cheat.code}` : `删除 ${cheat.code}`} onClick={() => onRemoveCheat(cheat.id)}>{cheat.builtIn ? '◆' : '×'}</button>
+          {!cheat.builtIn && <button className="pixel-cheat-delete" type="button" aria-label={`删除 ${cheat.code}`} onClick={() => onRemoveCheat(cheat.id)}>删除</button>}
         </div>)}</div>
       </div>}
-      <footer className="pixel-dialog-footer">
-        {mode !== 'cheats' && <><button type="button" disabled={busySlot !== null} onClick={onExport}>导出本游戏</button><button type="button" disabled={busySlot !== null} onClick={() => importInput.current?.click()}>导入本游戏</button><input ref={importInput} hidden type="file" accept=".json,application/json" onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) onImport(file) }} /></>}
-        <button type="button" onClick={onClose}>返回游戏</button>
-      </footer>
+      {mode !== 'cheats' && <footer className="pixel-dialog-footer"><button type="button" disabled={busySlot !== null} onClick={onExport}>导出本游戏</button><button type="button" disabled={busySlot !== null} onClick={() => importInput.current?.click()}>导入本游戏</button><input ref={importInput} hidden type="file" accept=".json,application/json" onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) onImport(file) }} /></footer>}
     </section>
   </div>
 }
