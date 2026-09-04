@@ -860,7 +860,7 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
           if (!value || typeof value !== 'object') return false
           const cheat = value as Partial<CheatRule>
           return typeof cheat.id === 'string' && typeof cheat.code === 'string' && cheat.code.length <= 256 && typeof cheat.enabled === 'boolean'
-        }).slice(0, 16)
+        })
         updateCheats(restored)
       }
       return result
@@ -922,7 +922,7 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
       <span className="player-gba-logo" aria-hidden="true"><small>GAME BOY</small><strong>ADVANCE</strong></span>
     </section>
     {quickNotice && <div className="player-notice" role="status" aria-live="polite">{quickNotice}</div>}
-    {activeTool && <GameToolsDialog mode={activeTool} slots={slots} busySlot={busySlot} cheats={cheats} onSave={slot => operateSlot('save', slot)} onLoad={slot => operateSlot('load', slot)} onDelete={deleteSlot} onExport={exportStates} onImport={importStates} onAddCheat={code => updateCheats([...cheats, { id: crypto.randomUUID(), code, enabled: true }].slice(0, 16))} onToggleCheat={id => updateCheats(cheats.map(cheat => cheat.id === id ? { ...cheat, enabled: !cheat.enabled } : cheat))} onRemoveCheat={id => updateCheats(cheats.filter(cheat => cheat.id !== id || cheat.builtIn))} onClose={() => setActiveTool(null)} />}
+    {activeTool && <GameToolsDialog mode={activeTool} slots={slots} busySlot={busySlot} cheats={cheats} onSave={slot => operateSlot('save', slot)} onLoad={slot => operateSlot('load', slot)} onDelete={deleteSlot} onExport={exportStates} onImport={importStates} onAddCheat={code => updateCheats([...cheats, { id: crypto.randomUUID(), code, enabled: true }])} onToggleCheat={id => updateCheats(cheats.map(cheat => cheat.id === id ? { ...cheat, enabled: !cheat.enabled } : cheat))} onRemoveCheat={id => updateCheats(cheats.filter(cheat => cheat.id !== id || cheat.builtIn))} onClose={() => setActiveTool(null)} />}
   </main>
 }
 
