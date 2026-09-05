@@ -646,7 +646,7 @@ function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDele
     setDragOverId(null)
   }
   const dragTargetAt = (clientX: number, clientY: number) => document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-cheat-id]')?.dataset.cheatId
-  const updateTouchDrag = (clientX: number, clientY: number) => {
+  const updatePointerDrag = (clientX: number, clientY: number) => {
     const draggedId = draggingIdRef.current
     if (!draggedId) return
     const targetId = dragTargetAt(clientX, clientY)
@@ -657,8 +657,17 @@ function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDele
     if (clientY < bounds.top + 42) list.scrollBy({ top: -18 })
     else if (clientY > bounds.bottom - 42) list.scrollBy({ top: 18 })
   }
-  const finishTouchDrag = (clientX: number, clientY: number) => {
+  const finishPointerDrag = (clientX: number, clientY: number) => {
     const draggedId = draggingIdRef.current
+    const sourceRow = draggedId ? document.querySelector<HTMLElement>(`[data-cheat-id="${draggedId}"]`) : null
+    const sourceBounds = sourceRow?.getBoundingClientRect()
+    const returnedToSource = sourceBounds
+      ? clientX >= sourceBounds.left && clientX <= sourceBounds.right && clientY >= sourceBounds.top && clientY <= sourceBounds.bottom
+      : false
+    if (returnedToSource) {
+      clearDrag()
+      return
+    }
     const targetId = dragTargetAt(clientX, clientY)
     if (draggedId && targetId && draggedId !== targetId) onSwapCheats(draggedId, targetId)
     clearDrag()
@@ -679,7 +688,6 @@ function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDele
           onAddCheat(code)
           setCheatCode('')
         }}><div><input id="cheat-code" aria-label="GameShark 或 CodeBreaker 代码" value={cheatCode} onChange={event => setCheatCode(event.target.value)} placeholder="GameShark / CodeBreaker 代码" spellCheck={false} /><button type="submit">添加</button></div></form>
-        <p className="pixel-cheat-shortcuts">快捷键：Ctrl+1～9 / Ctrl+0。拖到另一项松开即互换；新增代码可改名。</p>
         {draggingId && <div className="pixel-cheat-drag-hint">拖到目标金手指上松开·互换位置</div>}
         <div className="pixel-cheat-list" ref={cheatList}>{cheats.length === 0 ? <div className="pixel-empty-list">尚未添加代码</div> : cheats.map((cheat, index) => {
           const shortcut = cheatShortcutLabel(index)
@@ -687,26 +695,9 @@ function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDele
             className={`pixel-cheat-row${cheat.builtIn ? ' is-built-in' : ''}${draggingId === cheat.id ? ' is-dragging' : ''}${dragOverId === cheat.id ? ' is-drag-over' : ''}`}
             key={cheat.id}
             data-cheat-id={cheat.id}
-            onDragOver={event => {
-              if (!draggingId || draggingId === cheat.id) return
-              event.preventDefault()
-              event.dataTransfer.dropEffect = 'move'
-              setDragOverId(cheat.id)
-            }}
-            onDrop={event => {
-              event.preventDefault()
-              const draggedId = draggingId ?? event.dataTransfer.getData('text/plain')
-              if (draggedId && draggedId !== cheat.id) onSwapCheats(draggedId, cheat.id)
-              clearDrag()
-            }}
           >
-            <span className="pixel-cheat-drag" draggable role="button" tabIndex={0} aria-label={`拖拽排序 ${cheat.name ?? cheat.code}`} onDragStart={event => {
-              draggingIdRef.current = cheat.id
-              setDraggingId(cheat.id)
-              event.dataTransfer.effectAllowed = 'move'
-              event.dataTransfer.setData('text/plain', cheat.id)
-            }} onDragEnd={clearDrag} onPointerDown={event => {
-              if (event.pointerType === 'mouse' || event.button !== 0) return
+            <span className="pixel-cheat-drag" role="button" tabIndex={0} aria-label={`拖拽排序 ${cheat.name ?? cheat.code}`} onPointerDown={event => {
+              if (event.button !== 0) return
               event.preventDefault()
               draggingIdRef.current = cheat.id
               setDraggingId(cheat.id)
@@ -714,13 +705,13 @@ function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDele
               event.currentTarget.setPointerCapture(event.pointerId)
               triggerHapticFeedback()
             }} onPointerMove={event => {
-              if (event.pointerType === 'mouse' || draggingIdRef.current !== cheat.id) return
+              if (draggingIdRef.current !== cheat.id) return
               event.preventDefault()
-              updateTouchDrag(event.clientX, event.clientY)
+              updatePointerDrag(event.clientX, event.clientY)
             }} onPointerUp={event => {
-              if (event.pointerType === 'mouse' || draggingIdRef.current !== cheat.id) return
+              if (draggingIdRef.current !== cheat.id) return
               event.preventDefault()
-              finishTouchDrag(event.clientX, event.clientY)
+              finishPointerDrag(event.clientX, event.clientY)
             }} onPointerCancel={clearDrag}>⠇</span>
             <button type="button" className={cheat.enabled ? 'is-enabled' : ''} onClick={() => onToggleCheat(cheat.id)}>{cheat.enabled ? 'ON' : 'OFF'}</button>
             <span className="pixel-cheat-code">{renamingId === cheat.id ? <form className="pixel-cheat-rename" onSubmit={event => {
