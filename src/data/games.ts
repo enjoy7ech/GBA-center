@@ -447,7 +447,7 @@ export const games: Game[] = [
       },
       {
         id: 'castlevania-cotm-jp-always-drop-rare-item',
-        name: '稀有槽必掉（卡片/装备，100%，勿与普通同开）',
+        name: '稀有槽必掉（卡片/装备/药品，100%，勿与普通同开）',
         code: '08013BC2:8A0A',
         enabled: false,
         builtIn: true,
