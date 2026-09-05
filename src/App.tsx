@@ -780,7 +780,6 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
   const [quickNotice, setQuickNotice] = useState('')
   const [cleanMode, setCleanMode] = useState(false)
   const operationBusy = useRef(false)
-  const lastCleanModeTap = useRef(0)
   const [speed, setSpeed] = useState<EmulatorSpeed>(1)
   const adapter = useRef<MgbaCoreAdapter | null>(null)
   const title = route.game.title
@@ -922,15 +921,6 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     const draggedPosition = cheatShortcutLabel(toIndex) || `第 ${toIndex + 1} 个`
     const targetPosition = cheatShortcutLabel(fromIndex) || `第 ${fromIndex + 1} 个`
     setQuickNotice(`${dragged.name ?? dragged.code} → ${draggedPosition}；${target.name ?? target.code} → ${targetPosition}（已互换）`)
-  }
-  const leaveCleanMode = () => {
-    setCleanMode(false)
-  }
-  const handleCleanModePointerUp = (pointerType: string) => {
-    if (!cleanMode || pointerType === 'mouse') return
-    const now = performance.now()
-    if (now - lastCleanModeTap.current < 360) leaveCleanMode()
-    lastCleanModeTap.current = now
   }
   const exportStates = () => {
     void adapter.current?.exportStates().then(async contents => {
@@ -1090,7 +1080,7 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
           <button type="button" disabled={controlsDisabled} onClick={() => openTool('cheats')}><span>★</span>金手指</button>
         </nav>
         <div className="screen-stage">
-          <div className="screen-frame screen-wrap" onDoubleClick={() => { if (cleanMode) leaveCleanMode() }} onPointerUp={event => handleCleanModePointerUp(event.pointerType)}><div id="game" className="emulator-container emulator-host" />
+          <div className="screen-frame screen-wrap"><div id="game" className="emulator-container emulator-host" />
             {status === 'loading' && <div className="loading-screen"><div className="loading-logo">GBA</div><span>mGBA CORE</span><i /></div>}
           </div>
         </div>
