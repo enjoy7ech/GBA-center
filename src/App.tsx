@@ -836,8 +836,7 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     const timer = window.setInterval(() => {
       if (document.visibilityState !== 'visible' || activeTool || operationBusy.current) return
       operationBusy.current = true
-      setQuickBusy(true)
-      void adapter.current?.saveState(-2).catch(() => undefined).finally(() => { operationBusy.current = false; setQuickBusy(false) })
+      void adapter.current?.saveState(-2).catch(() => undefined).finally(() => { operationBusy.current = false })
     }, 30_000)
     return () => window.clearInterval(timer)
   }, [activeTool, status])
@@ -987,7 +986,7 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     }
     window.addEventListener('keydown', handleQuickKey, true); window.addEventListener('keyup', blockKeyUp, true)
     return () => { window.removeEventListener('keydown', handleQuickKey, true); window.removeEventListener('keyup', blockKeyUp, true) }
-  }, [keyboardBindings, speed, status, quickBusy])
+  }, [keyboardBindings, speed, status])
 
   useEffect(() => {
     const heldButtons = new Map<number, GbaButton>()
@@ -1040,7 +1039,7 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
       window.removeEventListener('blur', release)
       release()
     }
-  }, [activeTool, controlsDisabled, keyboardBindings, quickBusy, speed, status])
+  }, [activeTool, controlsDisabled, keyboardBindings, speed, status])
 
   useEffect(() => {
     const shortcutIndex = (event: KeyboardEvent) => {
