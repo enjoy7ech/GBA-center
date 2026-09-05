@@ -476,6 +476,52 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline-color: #ec4
   }
 }
 
+@media (orientation: landscape) and (min-width: 681px) and (max-height: 500px) {
+  .player-page {
+    padding:
+      max(6px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
+      max(6px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+  }
+  .player-layout.console {
+    width: 100%;
+    height: 100%;
+    grid-template-columns: clamp(150px, 21vw, 176px) minmax(0, 1fr) clamp(150px, 21vw, 176px);
+    gap: 6px;
+    padding: 4px 0 8px;
+  }
+  .quick-tools button {
+    min-height: 36px;
+    padding-inline: 10px;
+    font-size: 10px;
+  }
+  .side-controls > .shoulder-control {
+    height: 40px;
+    margin-top: 8px;
+    font-size: 16px;
+  }
+  .gba-dpad {
+    width: clamp(132px, 36dvh, 152px);
+    max-width: 100%;
+  }
+  .action-controls { gap: 10px; }
+  .action-control {
+    width: clamp(64px, 18dvh, 74px);
+    height: clamp(64px, 18dvh, 74px);
+    font-size: 24px;
+  }
+  .center-controls {
+    min-height: 36px;
+    gap: 18px;
+  }
+  .utility-button {
+    min-width: 88px;
+    min-height: 32px;
+    font-size: 10px;
+  }
+}
+
 /* A narrow landscape window cannot fit the stacked mobile controls without
    shrinking the game screen to a strip. Keep the tools and screen, and drop
    the complete lower control area as one unit. */
