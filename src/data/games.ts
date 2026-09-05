@@ -438,6 +438,13 @@ export const games: Game[] = [
         enabled: false,
         builtIn: true,
       },
+      {
+        id: 'castlevania-cotm-jp-always-drop-common-item',
+        name: '敌人必掉普通物品（100%）',
+        code: '08013C00:1E71',
+        enabled: false,
+        builtIn: true,
+      },
     ],
   },
   {
