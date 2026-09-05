@@ -480,7 +480,7 @@ export const games: Game[] = [
       },
       {
         id: 'yu-gi-oh-dm8-jp-three-tributes',
-        name: '我方祭品数固定为 3',
+        name: '祭品数固定为 3（双方生效）',
         code: '32021D20 0003',
         enabled: false,
         builtIn: true,
@@ -494,7 +494,7 @@ export const games: Game[] = [
       },
       {
         id: 'yu-gi-oh-dm8-jp-unlimited-summons',
-        name: '手牌可无限召唤',
+        name: '我方手牌可无限召唤',
         code: '32021A85 0001+32021A8D 0001+32021A95 0001+32021A9D 0001+32021AA5 0001',
         enabled: false,
         builtIn: true,

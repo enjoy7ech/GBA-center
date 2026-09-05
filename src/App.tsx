@@ -23,6 +23,10 @@ function normalizeKeyboardKey(key: string) { return key.length === 1 ? key.toLow
 function displayKeyboardKey(key: string) {
   return ({ ' ': 'Space', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' } as Record<string, string>)[key] ?? (key.length === 1 ? key.toUpperCase() : key)
 }
+function cheatShortcutLabel(index: number) {
+  if (index < 0 || index >= 10) return ''
+  return `Ctrl+${index === 9 ? 0 : index + 1}`
+}
 
 const nativeSwitchProps = { switch: '' } as React.InputHTMLAttributes<HTMLInputElement>
 function loadKeyboardBindings(): KeyboardBindings {
@@ -619,16 +623,46 @@ function SaveSlotCard({ slot, label, saved, busy, disabled, isSaveMode, onActiva
   </div>
 }
 
-function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDelete, onExport, onImport, onAddCheat, onToggleCheat, onRemoveCheat, onClose }: {
+function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDelete, onExport, onImport, onAddCheat, onToggleCheat, onRenameCheat, onSwapCheats, onRemoveCheat, onClose }: {
   mode: GameTool; slots: SaveStateSlot[]; busySlot: number | null; cheats: CheatRule[];
   onSave: (slot: number) => void; onLoad: (slot: number) => void; onDelete: (slot: number) => void;
   onExport: () => void; onImport: (file: File) => void;
-  onAddCheat: (code: string) => void; onToggleCheat: (id: string) => void; onRemoveCheat: (id: string) => void; onClose: () => void
+  onAddCheat: (code: string) => void; onToggleCheat: (id: string) => void; onRenameCheat: (id: string, name: string) => void;
+  onSwapCheats: (draggedId: string, targetId: string) => void; onRemoveCheat: (id: string) => void; onClose: () => void
 }) {
   const [cheatCode, setCheatCode] = useState('')
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
   const importInput = useRef<HTMLInputElement>(null)
+  const cheatList = useRef<HTMLDivElement>(null)
+  const draggingIdRef = useRef<string | null>(null)
   const isSaveMode = mode === 'save'
   const title = isSaveMode ? '存档' : mode === 'load' ? '读档' : '金手指'
+  const clearDrag = () => {
+    draggingIdRef.current = null
+    setDraggingId(null)
+    setDragOverId(null)
+  }
+  const dragTargetAt = (clientX: number, clientY: number) => document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-cheat-id]')?.dataset.cheatId
+  const updateTouchDrag = (clientX: number, clientY: number) => {
+    const draggedId = draggingIdRef.current
+    if (!draggedId) return
+    const targetId = dragTargetAt(clientX, clientY)
+    setDragOverId(targetId && targetId !== draggedId ? targetId : null)
+    const list = cheatList.current
+    if (!list) return
+    const bounds = list.getBoundingClientRect()
+    if (clientY < bounds.top + 42) list.scrollBy({ top: -18 })
+    else if (clientY > bounds.bottom - 42) list.scrollBy({ top: 18 })
+  }
+  const finishTouchDrag = (clientX: number, clientY: number) => {
+    const draggedId = draggingIdRef.current
+    const targetId = dragTargetAt(clientX, clientY)
+    if (draggedId && targetId && draggedId !== targetId) onSwapCheats(draggedId, targetId)
+    clearDrag()
+  }
   return <div className="pixel-dialog-backdrop" onContextMenu={event => event.preventDefault()} onPointerDown={event => { if (event.target === event.currentTarget) onClose() }}>
     <section className={`pixel-dialog${mode === 'cheats' ? ' is-cheat-dialog' : ''}`} role="dialog" aria-modal="true" aria-labelledby="game-tool-title">
       <header className="pixel-dialog-heading"><h2 id="game-tool-title">{title}</h2><button onClick={onClose} aria-label={`关闭${title}`}>×</button></header>
@@ -645,11 +679,59 @@ function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDele
           onAddCheat(code)
           setCheatCode('')
         }}><div><input id="cheat-code" aria-label="GameShark 或 CodeBreaker 代码" value={cheatCode} onChange={event => setCheatCode(event.target.value)} placeholder="GameShark / CodeBreaker 代码" spellCheck={false} /><button type="submit">添加</button></div></form>
-        <div className="pixel-cheat-list">{cheats.length === 0 ? <div className="pixel-empty-list">尚未添加代码</div> : cheats.map(cheat => <div className={`pixel-cheat-row${cheat.builtIn ? ' is-built-in' : ''}`} key={cheat.id}>
-          <button type="button" className={cheat.enabled ? 'is-enabled' : ''} onClick={() => onToggleCheat(cheat.id)}>{cheat.enabled ? 'ON' : 'OFF'}</button>
-          <span className="pixel-cheat-code">{cheat.name && <strong>{cheat.name}</strong>}<code>{cheat.code.replace(/\+/g, ' · ')}</code></span>
-          {!cheat.builtIn && <button className="pixel-cheat-delete" type="button" aria-label={`删除 ${cheat.code}`} onClick={() => onRemoveCheat(cheat.id)}>删除</button>}
-        </div>)}</div>
+        <p className="pixel-cheat-shortcuts">快捷键：Ctrl+1～9 / Ctrl+0。拖到另一项松开即互换；新增代码可改名。</p>
+        {draggingId && <div className="pixel-cheat-drag-hint">拖到目标金手指上松开·互换位置</div>}
+        <div className="pixel-cheat-list" ref={cheatList}>{cheats.length === 0 ? <div className="pixel-empty-list">尚未添加代码</div> : cheats.map((cheat, index) => {
+          const shortcut = cheatShortcutLabel(index)
+          return <div
+            className={`pixel-cheat-row${cheat.builtIn ? ' is-built-in' : ''}${draggingId === cheat.id ? ' is-dragging' : ''}${dragOverId === cheat.id ? ' is-drag-over' : ''}`}
+            key={cheat.id}
+            data-cheat-id={cheat.id}
+            onDragOver={event => {
+              if (!draggingId || draggingId === cheat.id) return
+              event.preventDefault()
+              event.dataTransfer.dropEffect = 'move'
+              setDragOverId(cheat.id)
+            }}
+            onDrop={event => {
+              event.preventDefault()
+              const draggedId = draggingId ?? event.dataTransfer.getData('text/plain')
+              if (draggedId && draggedId !== cheat.id) onSwapCheats(draggedId, cheat.id)
+              clearDrag()
+            }}
+          >
+            <span className="pixel-cheat-drag" draggable role="button" tabIndex={0} aria-label={`拖拽排序 ${cheat.name ?? cheat.code}`} onDragStart={event => {
+              draggingIdRef.current = cheat.id
+              setDraggingId(cheat.id)
+              event.dataTransfer.effectAllowed = 'move'
+              event.dataTransfer.setData('text/plain', cheat.id)
+            }} onDragEnd={clearDrag} onPointerDown={event => {
+              if (event.pointerType === 'mouse' || event.button !== 0) return
+              event.preventDefault()
+              draggingIdRef.current = cheat.id
+              setDraggingId(cheat.id)
+              setDragOverId(null)
+              event.currentTarget.setPointerCapture(event.pointerId)
+              triggerHapticFeedback()
+            }} onPointerMove={event => {
+              if (event.pointerType === 'mouse' || draggingIdRef.current !== cheat.id) return
+              event.preventDefault()
+              updateTouchDrag(event.clientX, event.clientY)
+            }} onPointerUp={event => {
+              if (event.pointerType === 'mouse' || draggingIdRef.current !== cheat.id) return
+              event.preventDefault()
+              finishTouchDrag(event.clientX, event.clientY)
+            }} onPointerCancel={clearDrag}>⠇</span>
+            <button type="button" className={cheat.enabled ? 'is-enabled' : ''} onClick={() => onToggleCheat(cheat.id)}>{cheat.enabled ? 'ON' : 'OFF'}</button>
+            <span className="pixel-cheat-code">{renamingId === cheat.id ? <form className="pixel-cheat-rename" onSubmit={event => {
+              event.preventDefault()
+              onRenameCheat(cheat.id, renameValue)
+              setRenamingId(null)
+            }}><input autoFocus maxLength={60} aria-label="金手指名称" value={renameValue} onChange={event => setRenameValue(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') setRenamingId(null) }} /><button type="submit">保存</button></form> : (shortcut || cheat.name) && <strong>{shortcut}{shortcut && cheat.name ? ' · ' : ''}{cheat.name}</strong>}<code>{cheat.code.replace(/\+/g, ' · ')}</code></span>
+            {!cheat.builtIn && <span className="pixel-cheat-actions"><button type="button" onClick={() => { setRenamingId(cheat.id); setRenameValue(cheat.name ?? '') }}>改名</button><button className="pixel-cheat-delete" type="button" aria-label={`删除 ${cheat.name ?? cheat.code}`} onClick={() => onRemoveCheat(cheat.id)}>删除</button></span>}
+            {dragOverId === cheat.id && <span className="pixel-cheat-swap-target">松开互换</span>}
+          </div>
+        })}</div>
       </div>}
       {mode !== 'cheats' && <footer className="pixel-dialog-footer"><button type="button" disabled={busySlot !== null} onClick={onExport}>导出本游戏</button><button type="button" disabled={busySlot !== null} onClick={() => importInput.current?.click()}>导入本游戏</button><input ref={importInput} hidden type="file" accept=".json,application/json" onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) onImport(file) }} /></footer>}
     </section>
@@ -759,7 +841,7 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
 
   useEffect(() => {
     if (!quickNotice) return
-    const timer = window.setTimeout(() => setQuickNotice(''), 1400)
+    const timer = window.setTimeout(() => setQuickNotice(''), 2200)
     return () => window.clearTimeout(timer)
   }, [quickNotice])
 
@@ -819,6 +901,24 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     if (adapter.current?.setSpeed(next)) { setSpeed(next); triggerHapticFeedback() }
   }
   const updateCheats = (next: CheatRule[]) => { setCheats(next); adapter.current?.setCheats(next); triggerHapticFeedback() }
+  const renameCheat = (id: string, name: string) => {
+    const trimmedName = name.trim()
+    updateCheats(cheats.map(cheat => cheat.id === id && !cheat.builtIn ? { ...cheat, name: trimmedName || undefined } : cheat))
+  }
+  const swapCheats = (draggedId: string, targetId: string) => {
+    const fromIndex = cheats.findIndex(cheat => cheat.id === draggedId)
+    const toIndex = cheats.findIndex(cheat => cheat.id === targetId)
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return
+    const next = [...cheats]
+    const dragged = next[fromIndex]
+    const target = next[toIndex]
+    next[fromIndex] = target
+    next[toIndex] = dragged
+    updateCheats(next)
+    const draggedPosition = cheatShortcutLabel(toIndex) || `第 ${toIndex + 1} 个`
+    const targetPosition = cheatShortcutLabel(fromIndex) || `第 ${fromIndex + 1} 个`
+    setQuickNotice(`${dragged.name ?? dragged.code} → ${draggedPosition}；${target.name ?? target.code} → ${targetPosition}（已互换）`)
+  }
   const leaveCleanMode = () => {
     setCleanMode(false)
   }
@@ -895,6 +995,30 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     return () => { window.removeEventListener('keydown', handleQuickKey, true); window.removeEventListener('keyup', blockKeyUp, true) }
   }, [keyboardBindings, speed, status, quickBusy])
 
+  useEffect(() => {
+    const shortcutIndex = (event: KeyboardEvent) => {
+      if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || !/^[0-9]$/.test(event.key)) return -1
+      return event.key === '0' ? 9 : Number(event.key) - 1
+    }
+    const toggleCheat = (event: KeyboardEvent) => {
+      if (event.repeat || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
+      const index = shortcutIndex(event)
+      if (index < 0 || controlsDisabled) return
+      const cheat = cheats[index]
+      if (!cheat) return
+      event.preventDefault(); event.stopImmediatePropagation()
+      const next = cheats.map((item, itemIndex) => itemIndex === index ? { ...item, enabled: !item.enabled } : item)
+      updateCheats(next)
+      setQuickNotice(`${cheatShortcutLabel(index)} ${cheat.name ?? cheat.code}：${next[index].enabled ? 'ON' : 'OFF'}`)
+    }
+    const blockKeyUp = (event: KeyboardEvent) => {
+      if (shortcutIndex(event) < 0) return
+      event.preventDefault(); event.stopImmediatePropagation()
+    }
+    window.addEventListener('keydown', toggleCheat, true); window.addEventListener('keyup', blockKeyUp, true)
+    return () => { window.removeEventListener('keydown', toggleCheat, true); window.removeEventListener('keyup', blockKeyUp, true) }
+  }, [cheats, controlsDisabled])
+
   return <main className={`player-page${cleanMode ? ' is-clean-mode' : ''}`}>
     <section className="player-layout console" aria-label="GBA 模拟器">
       <div className="control-zone control-zone-left side-controls side-controls-left">
@@ -921,8 +1045,8 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
       </div>
       <span className="player-gba-logo" aria-hidden="true"><small>GAME BOY</small><strong>ADVANCE</strong></span>
     </section>
-    {quickNotice && <div className="player-notice" role="status" aria-live="polite">{quickNotice}</div>}
-    {activeTool && <GameToolsDialog mode={activeTool} slots={slots} busySlot={busySlot} cheats={cheats} onSave={slot => operateSlot('save', slot)} onLoad={slot => operateSlot('load', slot)} onDelete={deleteSlot} onExport={exportStates} onImport={importStates} onAddCheat={code => updateCheats([...cheats, { id: crypto.randomUUID(), code, enabled: true }])} onToggleCheat={id => updateCheats(cheats.map(cheat => cheat.id === id ? { ...cheat, enabled: !cheat.enabled } : cheat))} onRemoveCheat={id => updateCheats(cheats.filter(cheat => cheat.id !== id || cheat.builtIn))} onClose={() => setActiveTool(null)} />}
+    {quickNotice && <div className={`player-notice${quickNotice.endsWith('：ON') ? ' is-on' : quickNotice.endsWith('：OFF') ? ' is-off' : ''}`} role="status" aria-live="polite">{quickNotice}</div>}
+    {activeTool && <GameToolsDialog mode={activeTool} slots={slots} busySlot={busySlot} cheats={cheats} onSave={slot => operateSlot('save', slot)} onLoad={slot => operateSlot('load', slot)} onDelete={deleteSlot} onExport={exportStates} onImport={importStates} onAddCheat={code => updateCheats([...cheats, { id: crypto.randomUUID(), code, enabled: true }])} onToggleCheat={id => updateCheats(cheats.map(cheat => cheat.id === id ? { ...cheat, enabled: !cheat.enabled } : cheat))} onRenameCheat={renameCheat} onSwapCheats={swapCheats} onRemoveCheat={id => updateCheats(cheats.filter(cheat => cheat.id !== id || cheat.builtIn))} onClose={() => setActiveTool(null)} />}
   </main>
 }
 
