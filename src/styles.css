@@ -384,7 +384,7 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline-color: #ec4
     height: auto;
     max-height: none;
     aspect-ratio: 3 / 5;
-    grid-template-rows: minmax(0, 1fr) auto auto clamp(178px, 24svh, 208px) auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto auto clamp(210px, 27svh, 232px) auto minmax(0, 1fr);
     align-content: center;
     gap: 10px 18px;
     border-radius: 24px;
@@ -392,9 +392,9 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline-color: #ec4
   }
   .quick-tools { grid-row: 2; }
   .quick-tools button {
-    height: 33px;
-    padding-inline: 6px;
-    font-size: 9px;
+    height: 40px;
+    padding-inline: 8px;
+    font-size: 10px;
   }
   .screen-stage {
     grid-row: 3;
@@ -424,30 +424,30 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline-color: #ec4
   }
   .center-controls { grid-row: 5; margin-top: 0; }
   .side-controls > .shoulder-control {
-    width: clamp(96px, 27vw, 116px);
-    height: 34px;
+    width: clamp(132px, 35vw, 152px);
+    height: 44px;
     margin-top: 4px;
-    font-size: 13px;
+    font-size: 16px;
   }
-  .gba-dpad { width: clamp(118px, 34vw, 142px); }
+  .gba-dpad { width: clamp(152px, 42vw, 170px); }
   .action-controls {
-    width: clamp(136px, 38vw, 158px);
-    height: clamp(108px, 30vw, 128px);
+    width: clamp(160px, 44vw, 176px);
+    height: clamp(136px, 37vw, 152px);
   }
   .action-controls .action-button {
-    width: clamp(58px, 16vw, 68px);
-    height: clamp(58px, 16vw, 68px);
-    font-size: 15px;
+    width: clamp(72px, 20vw, 82px);
+    height: clamp(72px, 20vw, 82px);
+    font-size: 18px;
   }
   .center-controls {
-    min-height: 34px;
-    gap: 18px;
+    min-height: 42px;
+    gap: 22px;
     transform: translateY(12px) rotate(-4deg);
   }
   .utility-button {
-    min-width: clamp(80px, 23vw, 98px);
-    min-height: 30px;
-    font-size: 9px;
+    min-width: clamp(108px, 29vw, 122px);
+    min-height: 40px;
+    font-size: 11px;
   }
 }
 
