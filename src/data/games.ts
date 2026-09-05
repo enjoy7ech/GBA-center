@@ -451,9 +451,9 @@ export const games: Game[] = [
     tags: ['卡牌 RPG', '汉化', '日版'],
     cheats: [
       {
-        id: 'yu-gi-oh-dm8-jp-all-cards-99',
-        name: '全 800 张卡片各 99 张（生效后关闭）',
-        code: '4201F2B0 6363+00000190 0002+3201F5D0 0063',
+        id: 'yu-gi-oh-dm8-jp-all-cards-1',
+        name: '全 800 张卡片各 1 张（生效后关闭）',
+        code: '4201F2B0 0101+00000190 0002+3201F5D0 0001',
         enabled: false,
         builtIn: true,
       },
@@ -495,7 +495,7 @@ export const games: Game[] = [
       {
         id: 'yu-gi-oh-dm8-jp-unlimited-summons',
         name: '我方手牌可无限召唤',
-        code: '32021A85 0001+32021A8D 0001+32021A95 0001+32021A9D 0001+32021AA5 0001',
+        code: '42021A84 0100+00000005 0008',
         enabled: false,
         builtIn: true,
       },

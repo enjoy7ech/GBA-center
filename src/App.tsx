@@ -20,8 +20,9 @@ const keyboardLabels: Record<KeyboardAction, string> = {
 }
 
 function normalizeKeyboardKey(key: string) { return key.length === 1 ? key.toLowerCase() : key }
+function mouseBindingKey(button: number) { return `Mouse${button}` }
 function displayKeyboardKey(key: string) {
-  return ({ ' ': 'Space', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' } as Record<string, string>)[key] ?? (key.length === 1 ? key.toUpperCase() : key)
+  return ({ ' ': 'Space', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Mouse0: '鼠标左键', Mouse1: '鼠标中键', Mouse2: '鼠标右键', Mouse3: '鼠标侧键 1', Mouse4: '鼠标侧键 2' } as Record<string, string>)[key] ?? (key.startsWith('Mouse') ? `鼠标键 ${key.slice(5)}` : key.length === 1 ? key.toUpperCase() : key)
 }
 function cheatShortcutLabel(index: number) {
   if (index < 0 || index >= 10) return ''
@@ -683,7 +684,7 @@ function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDele
       </div> : <div className="pixel-cheat-panel">
         <form className="pixel-cheat-form" onSubmit={event => {
           event.preventDefault()
-          const code = cheatCode.trim().toUpperCase().replace(/[\s,;]+/g, '+')
+          const code = cheatCode.trim().toUpperCase().replace(/\s*\+\s*|[\r\n,;]+/g, '+').replace(/[ \t]+/g, ' ')
           if (!code) return
           onAddCheat(code)
           setCheatCode('')
@@ -735,7 +736,7 @@ function KeyboardSettings({ bindings, onBind, onReset, onClose }: {
   const [capturing, setCapturing] = useState<KeyboardAction | null>(null)
   useEffect(() => {
     if (!capturing) return
-    const capture = (event: KeyboardEvent) => {
+    const captureKeyboard = (event: KeyboardEvent) => {
       event.preventDefault(); event.stopImmediatePropagation()
       if (event.repeat) return
       if (event.key === 'Escape') { setCapturing(null); return }
@@ -743,17 +744,29 @@ function KeyboardSettings({ bindings, onBind, onReset, onClose }: {
       onBind(capturing, normalizeKeyboardKey(event.key))
       setCapturing(null)
     }
-    window.addEventListener('keydown', capture, true)
-    return () => window.removeEventListener('keydown', capture, true)
+    const captureMouse = (event: MouseEvent) => {
+      event.preventDefault(); event.stopImmediatePropagation()
+      onBind(capturing, mouseBindingKey(event.button))
+      setCapturing(null)
+    }
+    const blockContextMenu = (event: MouseEvent) => { event.preventDefault(); event.stopImmediatePropagation() }
+    window.addEventListener('keydown', captureKeyboard, true)
+    window.addEventListener('mousedown', captureMouse, true)
+    window.addEventListener('contextmenu', blockContextMenu, true)
+    return () => {
+      window.removeEventListener('keydown', captureKeyboard, true)
+      window.removeEventListener('mousedown', captureMouse, true)
+      window.removeEventListener('contextmenu', blockContextMenu, true)
+    }
   }, [capturing, onBind])
-  return <div className="pixel-dialog-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) onClose() }}>
+  return <div className="pixel-dialog-backdrop" onContextMenu={event => event.preventDefault()} onPointerDown={event => { if (event.target === event.currentTarget) onClose() }}>
     <section className="pixel-dialog keyboard-dialog" role="dialog" aria-modal="true" aria-labelledby="keyboard-title">
       <header className="pixel-dialog-heading"><div><span>GAME BOY ADVANCE</span><h2 id="keyboard-title">系统设置</h2></div><button onClick={onClose} aria-label="关闭系统设置">×</button></header>
       <div className="binding-sections">
         <section><header><strong>游戏控制</strong><span>PLAYER 1</span></header><div className="binding-grid">{controllerActions.map(action => <button className={capturing === action ? 'is-capturing' : ''} key={action} onClick={() => setCapturing(action)}><span>{keyboardLabels[action]}</span><kbd>{capturing === action ? '按新键…' : displayKeyboardKey(bindings[action])}</kbd></button>)}</div></section>
         <section><header><strong>快捷功能</strong><span>SYSTEM</span></header><div className="binding-grid">{(['quickSave', 'quickLoad', 'speedToggle', 'cleanModeToggle'] as KeyboardAction[]).map(action => <button className={capturing === action ? 'is-capturing' : ''} key={action} onClick={() => setCapturing(action)}><span>{keyboardLabels[action]}</span><kbd>{capturing === action ? '按新键…' : displayKeyboardKey(bindings[action])}</kbd></button>)}</div></section>
       </div>
-      <footer className="pixel-dialog-footer keyboard-footer"><span>{capturing ? '按下新按键，Esc 取消' : '重复键会自动交换；P 键打开设置'}</span><button type="button" onClick={onReset}>恢复默认</button><button type="button" onClick={onClose}>完成</button></footer>
+      <footer className="pixel-dialog-footer keyboard-footer"><span>{capturing ? '按下键盘或鼠标按键，Esc 取消' : '重复键会自动交换；P 键打开设置'}</span><button type="button" onClick={onReset}>恢复默认</button><button type="button" onClick={onClose}>完成</button></footer>
     </section>
   </div>
 }
@@ -985,6 +998,59 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     window.addEventListener('keydown', handleQuickKey, true); window.addEventListener('keyup', blockKeyUp, true)
     return () => { window.removeEventListener('keydown', handleQuickKey, true); window.removeEventListener('keyup', blockKeyUp, true) }
   }, [keyboardBindings, speed, status, quickBusy])
+
+  useEffect(() => {
+    const heldButtons = new Map<number, GbaButton>()
+    const handledButtons = new Set<number>()
+    const actionFor = (button: number) => bindingActions.find(action => keyboardBindings[action] === mouseBindingKey(button))
+    const isInterfaceTarget = (target: EventTarget | null) => target instanceof Element && Boolean(target.closest('button, input, textarea, select, a, [role="button"]'))
+    const down = (event: MouseEvent) => {
+      const action = actionFor(event.button)
+      if (!action || controlsDisabled || activeTool || document.querySelector('.keyboard-dialog') || isInterfaceTarget(event.target)) return
+      event.preventDefault(); event.stopImmediatePropagation()
+      handledButtons.add(event.button)
+      if (controllerActions.includes(action as GbaButton)) {
+        const button = action as GbaButton
+        heldButtons.set(event.button, button)
+        adapter.current?.setInput(button, true)
+      } else if (action === 'quickSave' || action === 'quickLoad') quickSlot(action === 'quickSave' ? 'save' : 'load')
+      else if (action === 'speedToggle') cycleSpeed()
+      else {
+        adapter.current?.releaseInputs()
+        setActiveTool(null)
+        setCleanMode(value => !value)
+      }
+    }
+    const up = (event: MouseEvent) => {
+      if (!handledButtons.delete(event.button)) return
+      event.preventDefault(); event.stopImmediatePropagation()
+      const button = heldButtons.get(event.button)
+      if (button) adapter.current?.setInput(button, false)
+      heldButtons.delete(event.button)
+    }
+    const blockContextMenu = (event: MouseEvent) => {
+      if (!actionFor(2) || activeTool || document.querySelector('.keyboard-dialog') || isInterfaceTarget(event.target)) return
+      event.preventDefault(); event.stopImmediatePropagation()
+    }
+    const blockAuxClick = (event: MouseEvent) => {
+      if (!actionFor(event.button) || activeTool || document.querySelector('.keyboard-dialog') || isInterfaceTarget(event.target)) return
+      event.preventDefault(); event.stopImmediatePropagation()
+    }
+    const release = () => { heldButtons.clear(); handledButtons.clear(); adapter.current?.releaseInputs() }
+    window.addEventListener('mousedown', down, true)
+    window.addEventListener('mouseup', up, true)
+    window.addEventListener('contextmenu', blockContextMenu, true)
+    window.addEventListener('auxclick', blockAuxClick, true)
+    window.addEventListener('blur', release)
+    return () => {
+      window.removeEventListener('mousedown', down, true)
+      window.removeEventListener('mouseup', up, true)
+      window.removeEventListener('contextmenu', blockContextMenu, true)
+      window.removeEventListener('auxclick', blockAuxClick, true)
+      window.removeEventListener('blur', release)
+      release()
+    }
+  }, [activeTool, controlsDisabled, keyboardBindings, quickBusy, speed, status])
 
   useEffect(() => {
     const shortcutIndex = (event: KeyboardEvent) => {
