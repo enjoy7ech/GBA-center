@@ -212,6 +212,26 @@ export const games: Game[] = [
         enabled: false,
         builtIn: true,
       },
+      {
+        id: 'castlevania-aos-jp-guaranteed-item-drop',
+        name: '道具必掉（优先稀有，无稀有则普通）',
+        // 针对九柳 A2CJ ROM 的死亡掉落函数反汇编推导，用户已反馈实测正常。
+        // 掉魂后继续道具判定；选择非空稀有槽（否则普通槽），跳过概率失败分支。
+        // 无道具掉落表的怪物仍不掉道具；不改变掉魂概率。
+        code: '08066AD0:E012+08066B36:8970+08066B38:2800+08066B3A:D00A+08066B3C:E004+08066B8E:46C0',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'castlevania-aos-jp-guaranteed-soul-drop',
+        name: '掉魂率 100%（可掉魂怪物；待实测）',
+        // A2CJ：08066ABA 比较随机值与掉魂阈值，08066ABC 的 BHS 跳过掉魂。
+        // 仅将概率失败分支改为 NOP，保留怪物魂类型/可掉魂检查。
+        // 可与道具必掉同开；由用户实测。
+        code: '08066ABC:46C0',
+        enabled: false,
+        builtIn: true,
+      },
     ],
   },
   {

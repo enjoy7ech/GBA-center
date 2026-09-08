@@ -926,7 +926,11 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
       const backup = JSON.parse(contents) as Record<string, unknown>
       backup.cheats = cheats
       const gameTitle = route.game.title.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-').replace(/[. ]+$/g, '') || route.game.id
-      const fileName = `${gameTitle}-存档.json`
+      const exportedAt = new Date(typeof backup.exportedAt === 'number' ? backup.exportedAt : Date.now())
+      const pad = (value: number) => String(value).padStart(2, '0')
+      const date = `${exportedAt.getFullYear()}-${pad(exportedAt.getMonth() + 1)}-${pad(exportedAt.getDate())}`
+      const time = `${pad(exportedAt.getHours())}-${pad(exportedAt.getMinutes())}-${pad(exportedAt.getSeconds())}`
+      const fileName = `${gameTitle}-存档-${date}_${time}.json`
       const file = new File([JSON.stringify(backup)], fileName, { type: 'application/json' })
       if (await shareBackupFile(file, fileName.replace(/\.json$/i, ''))) return
       const url = URL.createObjectURL(file)
