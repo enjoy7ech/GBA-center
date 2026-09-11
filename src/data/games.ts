@@ -30,6 +30,145 @@ export type Game = {
  */
 export const games: Game[] = [
   {
+    id: 'mother-3-v1-2-chs-jp',
+    title: '地球冒险 3',
+    subtitle: 'MOTHER 3',
+    rom: '/roms/mother-3-v1-2-chs-jp.gba',
+    color: '#c93632',
+    year: '2006',
+    tags: ['RPG', '简体汉化 v1.2 补完版', '日版'],
+    // 漫游 + 空气 + 少年不知愁汉化；已核对 ROM 头 MOTHER3 / A3UJ，32 MiB。
+    // 日版原始地址转换为 CodeBreaker；汉化版游戏效果待实测，默认全部关闭。
+    // DP / 敌人穿透 / 氧气：https://www.arcenserv.info/gba/cheat/mother3/
+    // 存款 / 角色菜单 HP、PP：https://www5f.biglobe.ne.jp/~arctrus/SRWJ/mother3/index.htm
+    // HP、PP 仅修改移动时角色数据，不作为战斗中不减代码；不使用会随战斗变化的地址。
+    cheats: [
+      {
+        id: 'mother-3-jp-money-999999',
+        name: '随身 DP 999999（第 4 章起，生效后关闭）',
+        code: '82004868 423F+8200486A 000F',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'mother-3-jp-bank-999999',
+        name: '青蛙银行存款 999999（第 4 章起，生效后关闭）',
+        code: '8200486C 423F+8200486E 000F',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'mother-3-jp-no-encounters',
+        name: '穿过敌人不遇敌（角色闪烁，剧情战前关闭）',
+        code: '3200C492 0009',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'mother-3-jp-oxygen-full',
+        name: '水下氧气槽全满（潜水时开启）',
+        code: '8200DEB4 0708',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'mother-3-jp-flint-field-hp',
+        name: '弗林特 HP / 上限 999（移动时开启，生效后关闭）',
+        code: '82004194 03E7+8200419C 03E7',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'mother-3-jp-lucas-field-hp',
+        name: '卢卡斯 HP / 上限 999（移动时开启，生效后关闭）',
+        code: '82004200 03E7+82004208 03E7',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'mother-3-jp-lucas-field-pp',
+        name: '卢卡斯 PP / 上限 999（习得 PSI 后，生效后关闭）',
+        code: '82004204 03E7+8200420C 03E7',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'mother-3-jp-kumatora-field-hp',
+        name: '熊虎 HP / 上限 999（移动时开启，生效后关闭）',
+        code: '820042D8 03E7+820042E0 03E7',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'mother-3-jp-kumatora-field-pp',
+        name: '熊虎 PP / 上限 999（移动时开启，生效后关闭）',
+        code: '820042DC 03E7+820042E4 03E7',
+        enabled: false,
+        builtIn: true,
+      },
+    ],
+  },
+  {
+    id: 'zelda-the-minish-cap-cgp-chs',
+    title: '塞尔达传说：缩小帽',
+    subtitle: 'THE LEGEND OF ZELDA: THE MINISH CAP',
+    rom: '/roms/zelda-the-minish-cap-cgp-chs.gba',
+    // 欧版盒装封面：https://www.zelda-temple.net/media-and-downloads/box-art/the-legend-of-zelda-the-minish-cap
+    cover: '/covers/zelda-the-minish-cap-eu.jpg',
+    color: '#43864b',
+    year: '2004',
+    tags: ['动作冒险', 'CGP 简体汉化', '欧版 BZMP'],
+    // 原文件名标注 JP，但 ROM 头游戏代码实际为 BZMP，使用欧版地址。
+    // 来源：libretro/libretro-database 的 Minish Cap (USA, Europe) (Code Breaker).cht
+    // https://github.com/libretro/libretro-database/tree/master/cht/Nintendo%20-%20Game%20Boy%20Advance
+    // 数据布局核对：https://github.com/zeldaret/tmc/blob/master/include/save.h
+    // gSave = 02002A40；Stats 位于 +A8。汉化版游戏效果尚待实测。
+    cheats: [
+      {
+        id: 'zelda-tmc-bzmp-infinite-health',
+        name: '生命不减（进入游戏后开启）',
+        code: '32002AEA 00A0',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'zelda-tmc-bzmp-max-hearts',
+        name: '生命上限 20 心（生效后关闭）',
+        code: '32002AEB 00A0',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'zelda-tmc-bzmp-rupees-999',
+        name: '卢比 999（生效后关闭）',
+        code: '82002B00 03E7',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'zelda-tmc-bzmp-shells-999',
+        name: '神秘海螺 999（生效后关闭）',
+        code: '82002B02 03E7',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'zelda-tmc-bzmp-infinite-ammo',
+        name: '炸弹 / 弓箭 99（需先获得对应道具）',
+        code: '82002AEC 6363',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'zelda-tmc-bzmp-all-scrolls',
+        name: '全部剑技卷轴（生效后关闭）',
+        code: '82002B44 5555',
+        enabled: false,
+        builtIn: true,
+      },
+    ],
+  },
+  {
     id: 'pokemon-emerald-chs-us-v20120719',
     title: '口袋妖怪：绿宝石',
     subtitle: 'POKÉMON EMERALD',
@@ -232,6 +371,18 @@ export const games: Game[] = [
         enabled: false,
         builtIn: true,
       },
+      {
+        id: 'castlevania-aos-jp-infinite-air-jump',
+        name: '无限连跳（苍真；连续按跳跃）',
+        // 九柳 A2CJ ROM 静态定位，尚未做游戏实测。
+        // 08018244 是二段跳函数；080182B0 的掩码 04000004 改为 04000000，
+        // 只移除“已用二段跳”位 0x4 的限制，保留其余动作限制及按键检查。
+        // 0801847A: D033 -> 46C0 跳过未取得二段跳能力时的拒绝分支。
+        // 对照：https://github.com/testyourmine/cvaos/blob/main/asm/code/code_08014548.s
+        code: '080182B0:0000+0801847A:46C0',
+        enabled: false,
+        builtIn: true,
+      },
     ],
   },
   {
@@ -423,6 +574,24 @@ export const games: Game[] = [
         id: 'golden-sun-jp-battle-coins-5000',
         name: '战后金币 5000',
         code: '8203057C 1388+3203057E 0000',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'golden-sun-jp-guaranteed-item-drop',
+        name: '怪物 100% 掉落原设定物品',
+        // AGSJ 汉化 ROM：跳过掉落概率失败分支；没有掉落物的敌人不受影响。
+        code: '080B96BE:46C0',
+        restoreCode: '080B96BE:DD20',
+        enabled: false,
+        builtIn: true,
+      },
+      {
+        id: 'golden-sun-jp-consumables-not-decrease',
+        name: '消耗品使用不减（战斗内外）',
+        // 仅跳过菜单和战斗中的消耗调用，不影响出售、丢弃或剧情道具。
+        code: '080A0DB2:46C0+080A0DB4:46C0+080B1824:2001+080B1826:46C0',
+        restoreCode: '080A0DB2:F7CC+080A0DB4:F951+080B1824:F7BB+080B1826:FC18',
         enabled: false,
         builtIn: true,
       },

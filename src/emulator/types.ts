@@ -9,6 +9,7 @@ export type CheatRule = {
   id: string
   name?: string
   code: string
+  restoreCode?: string
   enabled: boolean
   builtIn?: boolean
 }

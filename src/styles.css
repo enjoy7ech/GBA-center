@@ -670,3 +670,12 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline-color: #ec4
 .player-page.is-clean-mode .screen-frame.screen-wrap::before { display: none; }
 .player-page.is-clean-mode .screen-frame.screen-wrap > .emulator-container,
 .player-page.is-clean-mode .screen-frame.screen-wrap > .loading-screen { position: absolute; inset: 0; }
+
+.save-feedback { position: fixed; z-index: 130; bottom: 5px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 24px); width: max-content; padding: 7px 12px; border-radius: 8px; background: #27243e; color: #fff; font-size: 12px; pointer-events: none; }
+.save-feedback.is-error { background: #852644; }
+.save-history-list { overflow: auto; min-height: 0; padding: 8px 2px; }
+.save-history-list p { font-size: 12px; }
+.save-history-list button { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 6px; padding: 8px; text-align: left; border: 1px solid #77758b; border-radius: 8px; background: #343541; color: white; cursor: pointer; }
+.save-history-list img { width: 84px; height: 56px; object-fit: cover; }
+.save-history-list small { display: block; margin-top: 4px; }
+.pixel-dialog-footer { flex-wrap: wrap; }

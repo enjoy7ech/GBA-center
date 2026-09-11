@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { games, type Game } from './data/games'
+import type { SaveHistory } from './emulator/saveStateStore'
 import { MgbaCoreAdapter } from './emulator/mgbaCoreAdapter'
 import type { CheatRule, EmulatorSpeed, EmulatorStatus, GbaButton, SaveStateSlot } from './emulator/types'
 
@@ -560,7 +561,7 @@ function HoldActionButton({ icon, label, disabled, onPress, onHold }: {
   ><span>{icon}</span>{holding ? '按住…' : label}</button>
 }
 
-type GameTool = 'save' | 'load' | 'cheats'
+type GameTool = 'save' | 'load' | 'cheats' | 'history'
 const saveSlots = [
   { slot: -2, label: 'AUTO' }, { slot: -1, label: 'QUICK' },
   ...Array.from({ length: 8 }, (_, index) => ({ slot: index, label: `SLOT ${String(index + 1).padStart(2, '0')}` })),
@@ -624,7 +625,8 @@ function SaveSlotCard({ slot, label, saved, busy, disabled, isSaveMode, onActiva
   </div>
 }
 
-function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDelete, onExport, onImport, onAddCheat, onToggleCheat, onRenameCheat, onSwapCheats, onRemoveCheat, onClose }: {
+function GameToolsDialog({ history, onHistoryLoad, onShowHistory, mode, slots, busySlot, cheats, onSave, onLoad, onDelete, onExport, onImport, onAddCheat, onToggleCheat, onRenameCheat, onSwapCheats, onRemoveCheat, onClose }: {
+  history: SaveHistory[]; onHistoryLoad: (id: string) => void; onShowHistory: () => void;
   mode: GameTool; slots: SaveStateSlot[]; busySlot: number | null; cheats: CheatRule[];
   onSave: (slot: number) => void; onLoad: (slot: number) => void; onDelete: (slot: number) => void;
   onExport: () => void; onImport: (file: File) => void;
@@ -640,7 +642,7 @@ function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDele
   const cheatList = useRef<HTMLDivElement>(null)
   const draggingIdRef = useRef<string | null>(null)
   const isSaveMode = mode === 'save'
-  const title = isSaveMode ? '存档' : mode === 'load' ? '读档' : '金手指'
+  const title = isSaveMode ? '存档' : mode === 'load' ? '读档' : mode === 'history' ? '历史恢复' : '金手指'
   const clearDrag = () => {
     draggingIdRef.current = null
     setDraggingId(null)
@@ -676,7 +678,13 @@ function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDele
   return <div className="pixel-dialog-backdrop" onContextMenu={event => event.preventDefault()} onPointerDown={event => { if (event.target === event.currentTarget) onClose() }}>
     <section className={`pixel-dialog${mode === 'cheats' ? ' is-cheat-dialog' : ''}`} role="dialog" aria-modal="true" aria-labelledby="game-tool-title">
       <header className="pixel-dialog-heading"><h2 id="game-tool-title">{title}</h2><button onClick={onClose} aria-label={`关闭${title}`}>×</button></header>
-      {mode !== 'cheats' ? <div className="save-slot-grid">
+      {mode === 'history' ? <div className="save-history-list">
+        <p>自动历史最多 120 份；其他恢复点最多 100 份。选择后读取，不删除历史。</p>
+        {history.length === 0 && <p>暂无历史版本。此功能不能恢复升级前已经丢失的数据。</p>}
+        {history.map(item => <button type="button" key={item.historyId} disabled={busySlot !== null} onClick={() => onHistoryLoad(item.historyId)}>
+          {item.thumbnail && <img src={item.thumbnail} alt="" />}<span>{new Date(item.updatedAt).toLocaleString('zh-CN')}<small>{({ auto: '自动存档历史', overwrite: '覆盖前备份', import: '导入前备份', delete: '删除前备份', 'before-load': '读档前进度' })[item.reason]} · {saveSlots.find(s => s.slot === item.slot)?.label}</small></span>
+        </button>)}
+      </div> : mode !== 'cheats' ? <div className="save-slot-grid">
         {saveSlots.map(({ slot, label }) => {
           const saved = slots.find(item => item.slot === slot)
           return <SaveSlotCard key={slot} slot={slot} label={label} saved={saved} busy={busySlot === slot} disabled={busySlot !== null || (!isSaveMode && !saved)} isSaveMode={isSaveMode} onActivate={() => isSaveMode ? onSave(slot) : onLoad(slot)} onDelete={() => onDelete(slot)} />
@@ -725,7 +733,7 @@ function GameToolsDialog({ mode, slots, busySlot, cheats, onSave, onLoad, onDele
           </div>
         })}</div>
       </div>}
-      {mode !== 'cheats' && <footer className="pixel-dialog-footer"><button type="button" disabled={busySlot !== null} onClick={onExport}>导出本游戏</button><button type="button" disabled={busySlot !== null} onClick={() => importInput.current?.click()}>导入本游戏</button><input ref={importInput} hidden type="file" accept=".json,application/json" onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) onImport(file) }} /></footer>}
+      {mode !== 'cheats' && <footer className="pixel-dialog-footer"><button type="button" disabled={busySlot !== null} onClick={onShowHistory}>历史恢复</button><button type="button" disabled={busySlot !== null} onClick={onExport}>保存当前并导出</button><button type="button" disabled={busySlot !== null} onClick={() => importInput.current?.click()}>导入本游戏</button><input ref={importInput} hidden type="file" accept=".json,application/json" onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) onImport(file) }} /></footer>}
     </section>
   </div>
 }
@@ -778,6 +786,11 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
   const [busySlot, setBusySlot] = useState<number | null>(null)
   const [quickBusy, setQuickBusy] = useState(false)
   const [quickNotice, setQuickNotice] = useState('')
+  const [saveMessage, setSaveMessage] = useState('')
+  const [saveFailed, setSaveFailed] = useState(false)
+  const [history, setHistory] = useState<SaveHistory[]>([])
+  const reportSaveError = (reason: unknown) => { setSaveFailed(true); setSaveMessage(reason instanceof Error ? reason.message : '存档操作失败，请重试。') }
+  const reportSaved = (message: string) => { setSaveFailed(false); setSaveMessage(message) }
   const [cleanMode, setCleanMode] = useState(false)
   const operationBusy = useRef(false)
   const [speed, setSpeed] = useState<EmulatorSpeed>(1)
@@ -803,7 +816,7 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
   useEffect(() => {
     if (!source) { setStatus('error'); console.error('[GBA] 没有找到 ROM。'); return }
     const instance = new MgbaCoreAdapter({
-      onReady: () => setStatus('ready'), onStart: () => setStatus('running'), onError: message => { console.error('[mGBA]', message); setStatus('error') },
+      onReady: () => setStatus('ready'), onStart: () => { setStatus('running'); if (!instance.canAutoSave()) reportSaved('已有存档：请先读档或手动存档，自动保存暂时暂停。') }, onError: message => { reportSaveError(new Error(message)); setStatus('error') },
     }, route.game.cover)
     adapter.current = instance
     void instance.load(source, route.game.rom.split('/').pop() ?? `${title}.gba`)
@@ -818,6 +831,7 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
   useEffect(() => {
     const keyMap = new Map(controllerActions.map(action => [keyboardBindings[action], action] as const))
     const handle = (event: KeyboardEvent, pressed: boolean) => {
+      if (pressed && (activeTool || document.querySelector('.keyboard-dialog'))) return
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
       const button = keyMap.get(normalizeKeyboardKey(event.key))
       if (!button) return
@@ -829,16 +843,22 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     const release = () => adapter.current?.releaseInputs()
     window.addEventListener('keydown', down, true); window.addEventListener('keyup', up, true); window.addEventListener('blur', release)
     return () => { window.removeEventListener('keydown', down, true); window.removeEventListener('keyup', up, true); window.removeEventListener('blur', release) }
-  }, [keyboardBindings])
+  }, [activeTool, keyboardBindings])
 
   useEffect(() => {
     if (status !== 'running') return
-    const timer = window.setInterval(() => {
-      if (document.visibilityState !== 'visible' || activeTool || operationBusy.current) return
+    const save = () => {
+      const instance = adapter.current
+      if (!instance?.canAutoSave() || activeTool || operationBusy.current) return
       operationBusy.current = true
-      void adapter.current?.saveState(-2).catch(() => undefined).finally(() => { operationBusy.current = false })
-    }, 30_000)
-    return () => window.clearInterval(timer)
+      void instance.saveState(-2, true).then(saved => {
+        if (saved) reportSaved('自动保存成功 · ' + new Date(saved.updatedAt).toLocaleTimeString('zh-CN'))
+      }).catch(reportSaveError).finally(() => { operationBusy.current = false })
+    }
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') save() }, 30_000)
+    const onHidden = () => { if (document.visibilityState === 'hidden') save() }
+    document.addEventListener('visibilitychange', onHidden)
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onHidden) }
   }, [activeTool, status])
 
   useEffect(() => {
@@ -861,20 +881,21 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     if (controlsDisabled) return
     adapter.current?.releaseInputs()
     setActiveTool(tool)
+    if (tool === 'history') void adapter.current?.listHistory().then(setHistory).catch(reportSaveError)
     if (tool !== 'cheats') void adapter.current?.listSaveStates().then(setSlots).catch(reason => console.error('[GBA] 获取存档失败。', reason))
   }
   const quickSlot = (mode: 'save' | 'load') => {
-    if (controlsDisabled || operationBusy.current) return
+    if (controlsDisabled || operationBusy.current || activeTool || document.querySelector('.keyboard-dialog')) return
     operationBusy.current = true; setQuickBusy(true)
     const action = mode === 'save' ? adapter.current?.saveState(-1) : adapter.current?.loadState(-1)
     void action?.then(result => {
       if (mode === 'load' && !result) {
-        console.error('[GBA] 快速槽位还没有存档。')
-        return
+        throw new Error('快速槽位还没有存档。')
       }
       setQuickNotice(mode === 'save' ? '快速存档完成' : '快速读档完成')
+      reportSaved(mode === 'save' ? '快速保存成功' : '读档完成，之前的进度可从历史恢复。')
       triggerHapticFeedback()
-    }).catch(reason => console.error('[GBA] 快速存读档失败。', reason)).finally(() => { operationBusy.current = false; setQuickBusy(false) })
+    }).catch(reportSaveError).finally(() => { operationBusy.current = false; setQuickBusy(false) })
   }
   const operateSlot = (mode: 'save' | 'load', slot: number) => {
     if (operationBusy.current) return
@@ -884,19 +905,27 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     const action = mode === 'save' ? currentAdapter.saveState(slot) : currentAdapter.loadState(slot)
     void action.then(result => {
       if (mode === 'save' && result) setSlots(current => [...current.filter(item => item.slot !== slot), result as SaveStateSlot].sort((a, b) => a.slot - b.slot))
-      if (mode === 'load' && !result) console.error('[GBA] 该槽位没有存档。')
+      if (mode === 'load' && !result) throw new Error('该槽位没有存档。')
+      reportSaved(mode === 'save' ? '保存成功' : '读档完成，之前的进度可从历史恢复。')
       triggerHapticFeedback()
-    }).catch(reason => console.error('[GBA] 存读档失败。', reason)).finally(() => { operationBusy.current = false; setBusySlot(null) })
+    }).catch(reportSaveError).finally(() => { operationBusy.current = false; setBusySlot(null) })
+  }
+  const loadHistory = (id: string) => {
+    const instance = adapter.current
+    if (!instance || operationBusy.current) return
+    operationBusy.current = true; setBusySlot(-99)
+    void instance.loadHistory(id).then(() => {
+      reportSaved('历史进度已读取，读档前的进度也已备份。')
+      setActiveTool(null)
+    }).catch(reportSaveError).finally(() => { operationBusy.current = false; setBusySlot(null) })
   }
   const deleteSlot = (slot: number) => {
-    const currentAdapter = adapter.current
-    if (!currentAdapter) { console.error('[GBA] 游戏尚未准备好。'); return }
-    setSlots(current => current.filter(item => item.slot !== slot))
-    triggerHapticFeedback()
-    void currentAdapter.deleteState(slot).catch(reason => {
-      console.error('[GBA] 删除存档失败。', reason)
-      void currentAdapter.listSaveStates().then(setSlots).catch(refreshReason => console.error('[GBA] 刷新存档失败。', refreshReason))
-    })
+    const instance = adapter.current
+    if (!instance || operationBusy.current) return
+    operationBusy.current = true; setBusySlot(slot)
+    void instance.deleteState(slot).then(() => instance.listSaveStates()).then(result => {
+      setSlots(result); reportSaved('已删除，可从历史恢复。')
+    }).catch(reportSaveError).finally(() => { operationBusy.current = false; setBusySlot(null) })
   }
   const cycleSpeed = () => {
     const next = gameSpeeds[(gameSpeeds.indexOf(speed) + 1) % gameSpeeds.length]
@@ -922,7 +951,12 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     setQuickNotice(`${dragged.name ?? dragged.code} → ${draggedPosition}；${target.name ?? target.code} → ${targetPosition}（已互换）`)
   }
   const exportStates = () => {
-    void adapter.current?.exportStates().then(async contents => {
+    const instance = adapter.current
+    if (!instance || operationBusy.current) return
+    operationBusy.current = true; setBusySlot(-99)
+    void instance.exportStates().then(async contents => {
+      setSlots(await instance.listSaveStates())
+      reportSaved('当前进度已保存到 AUTO，原 AUTO 可从历史恢复。')
       const backup = JSON.parse(contents) as Record<string, unknown>
       backup.cheats = cheats
       const gameTitle = route.game.title.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-').replace(/[. ]+$/g, '') || route.game.id
@@ -943,15 +977,22 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
     }).catch(reason => {
       if (reason instanceof DOMException && reason.name === 'AbortError') return
-      console.error('[GBA] 导出存档失败。', reason)
-    })
+      reportSaveError(reason)
+    }).finally(() => { operationBusy.current = false; setBusySlot(null) })
   }
   const importStates = (file: File) => {
     if (operationBusy.current) return
+    const instance = adapter.current
+    if (!instance) return
+    let importedLabels = ''
     operationBusy.current = true; setBusySlot(-99)
     void file.text().then(async contents => {
-      const backup = JSON.parse(contents) as { cheats?: unknown }
-      const result = await adapter.current?.importStates(contents)
+      const backup = JSON.parse(contents) as { cheats?: unknown; states?: SaveStateSlot[] }
+      const existing = await instance.listSaveStates()
+      const older = Array.isArray(backup?.states) ? backup.states.filter(incoming => incoming && existing.some(current => current.slot === incoming.slot && current.updatedAt > incoming.updatedAt)) : []
+      if (older.length && !window.confirm('此文件将用较早的存档替换 ' + older.length + ' 个槽位。现有版本会保留在历史恢复中。继续导入？')) return
+      const result = await instance.importStates(contents)
+      importedLabels = backup.states!.map(item => saveSlots.find(s => s.slot === item.slot)?.label).join('、')
       if (Array.isArray(backup.cheats)) {
         const restored = backup.cheats.filter((value): value is CheatRule => {
           if (!value || typeof value !== 'object') return false
@@ -962,14 +1003,18 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
       }
       return result
     }).then(result => {
-      if (result) setSlots(result)
+      if (result) {
+        setSlots(result)
+        setActiveTool('load')
+        reportSaved('导入完成，槽位：' + importedLabels + '。请点击读档；自动保存已暂停，直到读档或手动保存。')
+      }
       triggerHapticFeedback()
-    }).catch(reason => console.error('[GBA] 导入存档失败。', reason)).finally(() => { operationBusy.current = false; setBusySlot(null) })
+    }).catch(reportSaveError).finally(() => { operationBusy.current = false; setBusySlot(null) })
   }
 
   useEffect(() => {
     const handleQuickKey = (event: KeyboardEvent) => {
-      if (event.repeat || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
+      if (activeTool || document.querySelector('.keyboard-dialog') || event.repeat || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
       const key = normalizeKeyboardKey(event.key)
       const mode = key === keyboardBindings.quickSave ? 'save' : key === keyboardBindings.quickLoad ? 'load' : null
       const togglesCleanMode = key === keyboardBindings.cleanModeToggle
@@ -990,7 +1035,7 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
     }
     window.addEventListener('keydown', handleQuickKey, true); window.addEventListener('keyup', blockKeyUp, true)
     return () => { window.removeEventListener('keydown', handleQuickKey, true); window.removeEventListener('keyup', blockKeyUp, true) }
-  }, [keyboardBindings, speed, status])
+  }, [activeTool, keyboardBindings, speed, status])
 
   useEffect(() => {
     const heldButtons = new Map<number, GbaButton>()
@@ -1096,7 +1141,8 @@ function EmulatorPage({ route, keyboardBindings }: { route: Extract<Route, { pag
       <span className="player-gba-logo" aria-hidden="true"><small>GAME BOY</small><strong>ADVANCE</strong></span>
     </section>
     {quickNotice && <div className={`player-notice${quickNotice.endsWith('：ON') ? ' is-on' : quickNotice.endsWith('：OFF') ? ' is-off' : ''}`} role="status" aria-live="polite">{quickNotice}</div>}
-    {activeTool && <GameToolsDialog mode={activeTool} slots={slots} busySlot={busySlot} cheats={cheats} onSave={slot => operateSlot('save', slot)} onLoad={slot => operateSlot('load', slot)} onDelete={deleteSlot} onExport={exportStates} onImport={importStates} onAddCheat={code => updateCheats([...cheats, { id: crypto.randomUUID(), code, enabled: true }])} onToggleCheat={id => updateCheats(cheats.map(cheat => cheat.id === id ? { ...cheat, enabled: !cheat.enabled } : cheat))} onRenameCheat={renameCheat} onSwapCheats={swapCheats} onRemoveCheat={id => updateCheats(cheats.filter(cheat => cheat.id !== id || cheat.builtIn))} onClose={() => setActiveTool(null)} />}
+    {saveMessage && <div className={`save-feedback${saveFailed ? ' is-error' : ''}`} role={saveFailed ? 'alert' : 'status'}>{saveMessage}</div>}
+    {activeTool && <GameToolsDialog history={history} onHistoryLoad={loadHistory} onShowHistory={() => openTool('history')} mode={activeTool} slots={slots} busySlot={busySlot} cheats={cheats} onSave={slot => operateSlot('save', slot)} onLoad={slot => operateSlot('load', slot)} onDelete={deleteSlot} onExport={exportStates} onImport={importStates} onAddCheat={code => updateCheats([...cheats, { id: crypto.randomUUID(), code, enabled: true }])} onToggleCheat={id => updateCheats(cheats.map(cheat => cheat.id === id ? { ...cheat, enabled: !cheat.enabled } : cheat))} onRenameCheat={renameCheat} onSwapCheats={swapCheats} onRemoveCheat={id => updateCheats(cheats.filter(cheat => cheat.id !== id || cheat.builtIn))} onClose={() => setActiveTool(null)} />}
   </main>
 }
 

@@ -1,4 +1,4 @@
-import { deleteSaveState, exportGameSaveStates, importGameSaveStates, listSaveStates, readSaveState, writeSaveState } from './saveStateStore'
+import { updateSaveThumbnail, listSaveHistory, readSaveHistory, preserveBeforeLoad, type SaveStateRecord, deleteSaveState, exportGameSaveStates, importGameSaveStates, listSaveStates, readSaveState, writeSaveState } from './saveStateStore'
 import type { CheatRule, EmulatorSpeed, GbaButton, SaveStateSlot } from './types'
 
 type MgbaModule = {
@@ -62,6 +62,8 @@ export class MgbaCoreAdapter {
   private canvas: HTMLCanvasElement | null = null
   private generation = 0
   private gameId = 'game'
+  private autoSaveAllowed = false
+  private releaseSession: (() => void) | null = null
   private speed: EmulatorSpeed = 1
   private speedChangeTimer: number | null = null
   private heldButtons = new Set<GbaButton>()
@@ -84,6 +86,9 @@ export class MgbaCoreAdapter {
     this.gameId = gameName.replace(/\.[^.]+$/, '').replace(/[^\p{L}\p{N}_-]+/gu, '-').toLowerCase() || 'game'
 
     try {
+      await this.acquireSession(this.gameId)
+      if (generation !== this.generation) { this.releaseSession?.(); this.releaseSession = null; return }
+      this.autoSaveAllowed = (await listSaveStates(this.gameId)).length === 0
       const rom = gameUrl instanceof File ? await gameUrl.arrayBuffer() : await this.fetchRom(gameUrl)
       if (generation !== this.generation) return
 
@@ -165,38 +170,101 @@ export class MgbaCoreAdapter {
     }
   }
 
-  async saveState(slot: number): Promise<SaveStateSlot> {
-    const stateInfo = this.saveStateInfo?.().split('|')
-    if (!stateInfo || stateInfo[2] !== '1' || !this.module?.HEAPU8) throw new Error('游戏尚未准备好')
-    const size = Number.parseInt(stateInfo[0], 10)
-    const start = Number.parseInt(stateInfo[1], 10)
-    const state = this.module.HEAPU8.slice(start, start + size)
-    return writeSaveState(this.gameId, slot, state, await this.captureThumbnail())
+  private snapshot() {
+    const info = this.saveStateInfo?.().split('|')
+    const heap = this.module?.HEAPU8
+    if (!info || info[2] !== '1' || !heap) throw new Error('游戏尚未准备好，未保存。')
+    const size = Number(info[0]), start = Number(info[1])
+    if (!Number.isInteger(size) || !Number.isInteger(start) || size <= 0 || start < 0 || start + size > heap.length) throw new Error('核心返回无效存档，已停止覆盖。')
+    return heap.slice(start, start + size)
+  }
+
+  private thumbnail() {
+    // A preview must never delay or prevent writing the actual save bytes.
+    try { return this.canvas ? this.renderThumbnail(this.canvas, true) || this.fallbackThumbnail : this.fallbackThumbnail }
+    catch { return this.fallbackThumbnail }
+  }
+
+  private async capturePreview(): Promise<string> {
+    const canvas = this.canvas
+    if (!canvas?.captureStream || document.visibilityState !== 'visible') return ''
+    let stream: MediaStream | undefined
+    let video: HTMLVideoElement | undefined
+    try {
+      stream = canvas.captureStream(30)
+      video = document.createElement('video')
+      video.muted = true; video.playsInline = true; video.srcObject = stream
+      void video.play().catch(() => undefined)
+      const deadline = performance.now() + 500
+      while (performance.now() < deadline && document.visibilityState === 'visible') {
+        if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          const preview = this.renderThumbnail(video, true)
+          if (preview) return preview
+        }
+        await new Promise<void>(resolve => window.setTimeout(resolve, 25))
+      }
+    } catch { /* A failed preview cannot invalidate a committed save. */ }
+    finally {
+      stream?.getTracks().forEach(track => track.stop())
+      if (video) video.srcObject = null
+    }
+    return ''
+  }
+
+  canAutoSave() { return this.autoSaveAllowed }
+
+  async saveState(slot: number, automatic = false): Promise<SaveStateSlot | null> {
+    if (automatic && !this.autoSaveAllowed) return null
+    const gameId = this.gameId, generation = this.generation
+    const result = await writeSaveState(gameId, slot, this.snapshot(), this.thumbnail(), automatic ? 'auto' : 'overwrite')
+    if (!automatic && generation === this.generation) this.autoSaveAllowed = true
+    const preview = await this.capturePreview()
+    if (preview && generation === this.generation) {
+      try { await updateSaveThumbnail(gameId, slot, result.updatedAt, preview); result.thumbnail = preview } catch { /* Save bytes are already committed. */ }
+    }
+    return result
+  }
+
+  private async applyState(record: SaveStateRecord): Promise<SaveStateSlot> {
+    const module = this.module, load = this.loadStateFile, generation = this.generation
+    if (!module?.FS || !load) throw new Error('游戏尚未准备好。')
+    await preserveBeforeLoad(this.gameId, this.snapshot(), this.thumbnail())
+    if (generation !== this.generation) throw new Error('游戏已切换，读档已取消。')
+    try { module.FS.unlink(STATE_PATH) } catch { /* No previous state. */ }
+    module.FS.writeFile(STATE_PATH, record.data)
+    load(STATE_PATH, 0)
+    this.autoSaveAllowed = true
+    return { gameId: record.gameId, slot: record.slot, updatedAt: record.updatedAt, thumbnail: record.thumbnail }
   }
 
   async loadState(slot: number): Promise<SaveStateSlot | null> {
     const record = await readSaveState(this.gameId, slot)
-    if (!record || !this.module?.FS || !this.loadStateFile) return null
-    try { this.module.FS.unlink(STATE_PATH) } catch { /* No previous state. */ }
-    this.module.FS.writeFile(STATE_PATH, record.data)
-    this.loadStateFile(STATE_PATH, 0)
-    return { gameId: record.gameId, slot: record.slot, updatedAt: record.updatedAt, thumbnail: record.thumbnail }
+    return record ? this.applyState(record) : null
   }
-
-  listSaveStates() {
-    return listSaveStates(this.gameId)
-  }
-
-  async deleteState(slot: number) {
-    await deleteSaveState(this.gameId, slot)
-  }
-
-  exportStates() {
+  async loadHistory(historyId: string) { return this.applyState(await readSaveHistory(this.gameId, historyId)) }
+  listHistory() { return listSaveHistory(this.gameId) }
+  listSaveStates() { return listSaveStates(this.gameId) }
+  async deleteState(slot: number) { await deleteSaveState(this.gameId, slot) }
+  async exportStates() {
+    // Explicit export captures the current game in AUTO; its previous value is archived.
+    await this.saveState(-2)
     return exportGameSaveStates(this.gameId)
   }
+  async importStates(contents: string) {
+    const result = await importGameSaveStates(this.gameId, contents)
+    // Import changes stored slots, not the live core. Wait for an explicit load/save.
+    this.autoSaveAllowed = false
+    return result
+  }
 
-  importStates(contents: string) {
-    return importGameSaveStates(this.gameId, contents)
+  private async acquireSession(gameId: string) {
+    if (!navigator.locks) throw new Error('当前浏览器不支持安全存档锁，请更新浏览器。')
+    await new Promise<void>((resolve, reject) => {
+      void navigator.locks.request('gba-center:play:' + gameId, { ifAvailable: true }, async lock => {
+        if (!lock) { reject(new Error('这个游戏已在另一个标签页运行，请关闭那个标签页后重试。')); return }
+        await new Promise<void>(release => { this.releaseSession = release; resolve() })
+      }).catch(reject)
+    })
   }
 
   getGameId() {
@@ -232,12 +300,16 @@ export class MgbaCoreAdapter {
   private applyCheats() {
     if (!this.resetCheats || !this.setCheat) return
     this.resetCheats()
-    // This EmulatorJS core still parses/registers a code passed with enabled=0.
-    // Never submit disabled rules at all; rebuild the core cheat list using only
-    // switches that are visibly ON.
-    this.cheats
-      .filter(cheat => cheat.enabled)
-      .forEach((cheat, index) => this.setCheat?.(index, 1, cheat.code))
+    // This EmulatorJS core still parses/registers active codes passed with
+    // enabled=0, so rebuild the list and explicitly choose active or restore bytes.
+    let index = 0
+    this.cheats.forEach(cheat => {
+      // mGBA removes a ROM-patch rule without restoring the original instruction.
+      // Built-in ROM patches can provide the original bytes so OFF takes effect
+      // immediately, without requiring the player to reload the game.
+      const code = cheat.enabled ? cheat.code : cheat.restoreCode
+      if (code) this.setCheat?.(index++, 1, code)
+    })
   }
 
   releaseInputs() {
@@ -248,6 +320,9 @@ export class MgbaCoreAdapter {
 
   destroy() {
     this.generation++
+    this.autoSaveAllowed = false
+    this.releaseSession?.()
+    this.releaseSession = null
     if (this.speedChangeTimer !== null) {
       window.clearTimeout(this.speedChangeTimer)
       this.speedChangeTimer = null
@@ -333,50 +408,6 @@ export class MgbaCoreAdapter {
     this.toggleFastForward = cwrap('toggle_fastforward', null, ['number']) as typeof this.toggleFastForward
     this.resetCheats = cwrap('reset_cheat', null, []) as typeof this.resetCheats
     this.setCheat = cwrap('set_cheat', null, ['number', 'number', 'string']) as typeof this.setCheat
-  }
-
-  private async captureThumbnail() {
-    const canvas = this.canvas
-    if (!canvas) return ''
-
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
-    const directThumbnail = this.renderThumbnail(canvas, true)
-    if (directThumbnail) return directThumbnail
-
-    // WebGL clears its drawing buffer after compositing. captureStream reads
-    // the composed frames, so it remains reliable even when drawImage(canvas)
-    // only sees an empty framebuffer.
-    if (typeof canvas.captureStream === 'function') {
-      const stream = canvas.captureStream(30)
-      const video = document.createElement('video')
-      video.muted = true
-      video.playsInline = true
-      video.srcObject = stream
-      try {
-        await Promise.race([
-          video.play(),
-          new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error('截图视频流超时')), 500)),
-        ])
-        for (let attempt = 0; attempt < 8; attempt++) {
-          await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
-          if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) continue
-          const thumbnail = this.renderThumbnail(video, true)
-          if (thumbnail) return thumbnail
-        }
-      } catch {
-        // Mobile browsers may not support canvas capture streams.
-      } finally {
-        stream.getTracks().forEach(track => track.stop())
-        video.srcObject = null
-      }
-    }
-
-    for (let attempt = 0; attempt < 4; attempt++) {
-      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
-      const thumbnail = this.renderThumbnail(canvas, true)
-      if (thumbnail) return thumbnail
-    }
-    return this.fallbackThumbnail
   }
 
   private renderThumbnail(source: CanvasImageSource, requireVisiblePixels = false) {
